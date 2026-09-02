@@ -9,7 +9,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-database-compat.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-/* (same as before – keep compact) */
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--primary:#6366f1;--primary-light:#818cf8;--primary-dark:#4338ca;--success:#10b981;--warning:#f59e0b;--danger:#ef4444;--rose:#f43f5e;--bg:#f8fafc;--card:#ffffff;--border:#e2e8f0;--text:#0f172a;--slate:#64748b;--shadow:0 4px 12px rgba(0,0,0,0.06)}
 body{font-family:'Inter',sans-serif;background:var(--bg);min-height:100vh;color:var(--text)}
@@ -93,6 +92,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);min-height:100vh;color:
 .total-label{font-size:0.68rem;opacity:0.8;margin-top:6px;font-weight:600;line-height:1.2}
 .entry-detail-block{background:#f8fafc;border-radius:10px;padding:10px;margin-top:6px;font-size:0.8rem;border-left:3px solid var(--primary)}
 .entry-detail-block strong{color:var(--text)}
+.treatment-block{margin-top:8px;padding:8px;background:#fff;border-radius:8px;border:1px solid var(--border)}
+.treatment-block .treat-label{font-weight:700;color:var(--primary);font-size:0.8rem}
 </style>
 </head>
 <body>
@@ -210,7 +211,6 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// Correct rabbit mapping (20 rabbits, 4 treatments)
 const TREATMENT_RABBITS = {
   control: [1,2,3,4],
   t1: [5,6,7,8],
@@ -254,12 +254,71 @@ function formatDeathEntriesFull(deathEntries){
   return deathEntries.map(e => `${e.category} R${e.rabbit}: ${e.count}`).join('; ');
 }
 
+// ----- Group logs by (date, groupId, workerName) and combine -----
+function groupLogsByWorker(logs){
+  const groups = {};
+  logs.forEach(l => {
+    const key = l.date.split('T')[0] + '|' + (l.groupId || 'unknown') + '|' + (l.workerName || 'unknown');
+    if(!groups[key]) {
+      groups[key] = {
+        date: l.date,
+        groupId: l.groupId,
+        groupName: l.groupName,
+        workerName: l.workerName,
+        entries: []
+      };
+    }
+    groups[key].entries.push(l);
+  });
+  return Object.values(groups);
+}
+
+function combineWorkerLogs(group){
+  const entries = group.entries;
+  // Combine totals
+  const combined = {
+    date: group.date,
+    groupId: group.groupId,
+    groupName: group.groupName,
+    workerName: group.workerName,
+    rMale: sum(entries, 'rMale'),
+    rFemale: sum(entries, 'rFemale'),
+    rWeaners: sum(entries, 'rWeaners'),
+    rKits: sum(entries, 'rKits'),
+    rabbitsSold: sum(entries, 'rabbitsSold'),
+    deaths: sum(entries, 'deaths'),
+    newKits: sum(entries, 'newKits'),
+    litters: sum(entries, 'litters'),
+    boughtAdultMale: sum(entries, 'boughtAdultMale'),
+    boughtAdultFemale: sum(entries, 'boughtAdultFemale'),
+    boughtWeaners: sum(entries, 'boughtWeaners'),
+    boughtKits: sum(entries, 'boughtKits'),
+    matingDate: entries.find(e => e.matingDate)?.matingDate || null,
+    edd: entries.find(e => e.edd)?.edd || null,
+    deliveryDate: entries.find(e => e.deliveryDate)?.deliveryDate || null,
+    // Treatments: collect all treatments from entries
+    treatments: entries.map(e => ({
+      feedTreatment: e.feedTreatment,
+      weightTreatment: e.weightTreatment,
+      feedEntries: e.feedEntries || [],
+      weightEntries: e.weightEntries || [],
+      waterLitres: e.waterLitres || 0,
+      litterEntries: e.litterEntries || [],
+      deathEntries: e.deathEntries || []
+    }))
+  };
+  return combined;
+}
+
 // ----- Overview (enhanced) -----
 function updateOverview(){
   Promise.all([getLogs(),getGroups(),getWorkers()]).then(([logs,groups,workers])=>{
-    const tl=logs.filter(l=>new Date(l.date).toDateString()===todayStr() && l.farm==='rabbit');
-    const rlogs=tl;
-    const rMale=sum(rlogs,'rMale'), rFemale=sum(rlogs,'rFemale'), rWeaners=sum(rlogs,'rWeaners'), rKits=sum(rlogs,'rKits'), rSold=sum(rlogs,'rabbitsSold'), rDeaths=sum(rlogs,'deaths'), rNewKits=sum(rlogs,'newKits');
+    const todayLogs = logs.filter(l => new Date(l.date).toDateString() === todayStr() && l.farm === 'rabbit');
+    const grouped = groupLogsByWorker(todayLogs);
+    const combinedLogs = grouped.map(g => combineWorkerLogs(g));
+
+    const tl = combinedLogs;
+    const rMale=sum(tl,'rMale'), rFemale=sum(tl,'rFemale'), rWeaners=sum(tl,'rWeaners'), rKits=sum(tl,'rKits'), rSold=sum(tl,'rabbitsSold'), rDeaths=sum(tl,'deaths'), rNewKits=sum(tl,'newKits');
 
     document.getElementById('rabbitStats').innerHTML=
       stat('rose',rMale,'Males')+stat('rose',rFemale,'Females')+stat('rose',rWeaners,'Weaners')+stat('rose',rKits,'Kits')+stat('green',rNewKits,'New Kits')+stat('',rSold,'Sold Today')+stat(rDeaths>0?'red':'','Deaths: '+rDeaths,'',true);
@@ -298,37 +357,53 @@ function updateOverview(){
 
 function filterGroup(id){ activeGroupFilter=id; updateOverview(); }
 
-function renderGroupView(groups, tl){
+function renderGroupView(groups, combinedLogs){
   const target=activeGroupFilter==='all'?groups:groups.filter(g=>g.id===activeGroupFilter);
   if(!target.length){ document.getElementById('groupView').innerHTML='<div class="empty-state">No groups.</div>'; return; }
   let html='';
   target.forEach(g=>{
-    const gLogs=tl.filter(l=>l.groupId===g.id);
-    html+=`<div style="margin-bottom:24px"><div class="group-header"><div><div class="group-header-name">${g.name}</div><div class="group-header-sub">${gLogs.length} entries today</div></div><div class="group-total-badge">${gLogs.length} logs</div></div>`;
+    const gLogs=combinedLogs.filter(l=>l.groupId===g.id);
+    html+=`<div style="margin-bottom:24px"><div class="group-header"><div><div class="group-header-name">${g.name}</div><div class="group-header-sub">${gLogs.length} workers logged today</div></div><div class="group-total-badge">${gLogs.length} entries</div></div>`;
     if(gLogs.length){
       gLogs.forEach(l=>{
-        const feedT = treatmentLabel(l.feedTreatment);
-        const weightT = treatmentLabel(l.weightTreatment);
         html+=`<div class="data-row">
           <div class="data-row-header">
-            <span>🐇 ${l.workerName} — Feed: ${feedT}, Weight: ${weightT}</span>
-            <span>💧 ${l.waterLitres||0}L</span>
+            <span>🐇 ${l.workerName}</span>
+            <span>💧 ${l.treatments.reduce((s,t)=>s+t.waterLitres,0)}L</span>
           </div>
           <div class="data-row-detail">
             Males:${l.rMale}, Females:${l.rFemale}, Weaners:${l.rWeaners}, Kits:${l.rKits} |
-            Bought: M:${l.boughtAdultMale||0}, F:${l.boughtAdultFemale||0}, W:${l.boughtWeaners||0}, K:${l.boughtKits||0} |
-            Sold:${l.rabbitsSold||0} | New Kits:${l.newKits||0} | Litters:${l.litters||0}
+            Bought: M:${l.boughtAdultMale}, F:${l.boughtAdultFemale}, W:${l.boughtWeaners}, K:${l.boughtKits} |
+            Sold:${l.rabbitsSold} | New Kits:${l.newKits} | Litters:${l.litters}
             ${l.matingDate?` | Mating:${l.matingDate}`:''}
             ${l.edd?` | EDD:${l.edd}`:''}
             ${l.deliveryDate?` | Delivered:${l.deliveryDate}`:''}
-          </div>
-          <div class="entry-detail-block">
-            <strong>🌾 Feed per rabbit (${feedT}):</strong> ${formatFeedEntriesFull(l.feedEntries, l.feedTreatment)}<br>
-            <strong>⚖️ Weight per rabbit (${weightT}):</strong> ${formatWeightEntriesFull(l.weightEntries, l.weightTreatment)}<br>
-            <strong>🐣 Litters/Kits:</strong> ${formatLitterEntriesFull(l.litterEntries)}<br>
-            <strong>💀 Deaths:</strong> ${formatDeathEntriesFull(l.deathEntries)}
-          </div>
-          <div class="data-row-detail" style="font-size:0.7rem;color:var(--slate)">${new Date(l.date).toLocaleString()}</div>
+          </div>`;
+
+        // Show each treatment block
+        l.treatments.forEach((t, idx) => {
+          const feedT = treatmentLabel(t.feedTreatment);
+          const weightT = treatmentLabel(t.weightTreatment);
+          html+=`<div class="treatment-block">
+            <div class="treat-label">${feedT} / ${weightT} — Water: ${t.waterLitres}L</div>
+            <div style="font-size:0.75rem;color:var(--slate);margin-top:2px">
+              <strong>🌾 Feed:</strong> ${formatFeedEntriesFull(t.feedEntries, t.feedTreatment)}<br>
+              <strong>⚖️ Weight:</strong> ${formatWeightEntriesFull(t.weightEntries, t.weightTreatment)}
+            </div>
+          </div>`;
+        });
+
+        // Combined litter/deaths across all treatments
+        const allLitter = l.treatments.flatMap(t => t.litterEntries || []);
+        const allDeath = l.treatments.flatMap(t => t.deathEntries || []);
+        if(allLitter.length || allDeath.length){
+          html+=`<div class="entry-detail-block" style="margin-top:4px">
+            <strong>🐣 Litters/Kits:</strong> ${formatLitterEntriesFull(allLitter)}<br>
+            <strong>💀 Deaths:</strong> ${formatDeathEntriesFull(allDeath)}
+          </div>`;
+        }
+
+        html+=`<div class="data-row-detail" style="font-size:0.7rem;color:var(--slate)">${new Date(l.date).toLocaleString()}</div>
         </div>`;
       });
     } else {
@@ -348,29 +423,36 @@ function totalItem(num,label){ return `<div class="total-item"><div class="total
 // ----- Activity (enhanced) -----
 function renderRecentActivity(){
   Promise.all([getLogs(),getGroups()]).then(([logs,groups])=>{
-    let recentHtml=logs.slice().reverse().filter(l=>l.farm==='rabbit' && groups.some(g=>g.id===l.groupId)).slice(0,20).map(l=>{
+    // Group logs by date/group/worker for activity too
+    const grouped = groupLogsByWorker(logs.filter(l => l.farm === 'rabbit'));
+    const combined = grouped.map(g => combineWorkerLogs(g)).slice(0,20);
+    let recentHtml=combined.map(l=>{
       const t=new Date(l.date).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
       const d=new Date(l.date).toLocaleDateString('en-US',{month:'short',day:'numeric'});
-      const grpName=groups.find(g=>g.id===l.groupId)?.name||'Unknown';
+      const grpName=l.groupName||'Unknown';
       const worker=l.workerName||'Worker';
-      const feedT = treatmentLabel(l.feedTreatment);
-      const weightT = treatmentLabel(l.weightTreatment);
-      let desc=`${worker} — Feed: ${feedT}, Weight: ${weightT}`;
-      let details=`Males: ${l.rMale||0}, Females: ${l.rFemale||0}, Weaners: ${l.rWeaners||0}, Kits: ${l.rKits||0}`;
-      details+=` | Bought: M:${l.boughtAdultMale||0}, F:${l.boughtAdultFemale||0}, W:${l.boughtWeaners||0}, K:${l.boughtKits||0} | Sold: ${l.rabbitsSold||0}`;
-      details+=` | Water: ${l.waterLitres||0}L`;
-      details+=` | Feed per rabbit (${feedT}): ${formatFeedEntriesFull(l.feedEntries, l.feedTreatment)}`;
-      details+=` | Weight per rabbit (${weightT}): ${formatWeightEntriesFull(l.weightEntries, l.weightTreatment)}`;
-      details+=` | Litters/Kits: ${formatLitterEntriesFull(l.litterEntries)}`;
-      details+=` | Deaths: ${formatDeathEntriesFull(l.deathEntries)}`;
-      if(l.matingDate) details+=` | Mating: ${l.matingDate}`;
+      let desc=`${worker}`;
+      let details=`Males: ${l.rMale}, Females: ${l.rFemale}, Weaners: ${l.rWeaners}, Kits: ${l.rKits}`;
+      details+=` | Bought: M:${l.boughtAdultMale}, F:${l.boughtAdultFemale}, W:${l.boughtWeaners}, K:${l.boughtKits} | Sold: ${l.rabbitsSold}`;
+      details+=` | Total Water: ${l.treatments.reduce((s,t)=>s+t.waterLitres,0)}L`;
+      // Show each treatment
+      l.treatments.forEach(t => {
+        const feedT = treatmentLabel(t.feedTreatment);
+        details+=` | ${feedT} Feed: ${formatFeedEntriesFull(t.feedEntries, t.feedTreatment)}`;
+        details+=` | ${feedT} Weight: ${formatWeightEntriesFull(t.weightEntries, t.weightTreatment)}`;
+        details+=` | ${feedT} Water: ${t.waterLitres}L`;
+      });
+      const allLitter = l.treatments.flatMap(t => t.litterEntries || []);
+      const allDeath = l.treatments.flatMap(t => t.deathEntries || []);
+      if(allLitter.length) details+=` | Litters/Kits: ${formatLitterEntriesFull(allLitter)}`;
+      if(allDeath.length) details+=` | Deaths: ${formatDeathEntriesFull(allDeath)}`;
       return `<div class="timeline-item"><div class="t-dot ${l.deaths>0?'danger':''}"></div><div class="t-body"><div class="t-title">🐇 ${desc}</div><div class="t-desc">${details}</div><div style="font-size:0.7rem;color:var(--slate);margin-top:2px">${grpName}</div></div><div class="t-time"><div>${d}</div><div>${t}</div></div></div>`;
     }).join('') || '<div class="empty-state">No recent rabbit farm activity.</div>';
     document.getElementById('recentLogs').innerHTML=recentHtml;
   });
 }
 
-// ----- Analytics (unchanged, uses existing helpers) -----
+// ----- Analytics (unchanged) -----
 function setRange(range){ activeRange=range; document.querySelectorAll('.range-tab').forEach(b=>b.classList.remove('active')); document.querySelector(`.range-tab[onclick="setRange('${range}')"]`).classList.add('active'); updateAnalytics(); }
 function setWaterRange(r){ waterRange=r; updateWaterChart(); }
 
@@ -532,8 +614,11 @@ async function makeReport(type, specificDate=null){
     document.getElementById('reportBox').classList.remove('hidden');
     return;
   }
+  const grouped = groupLogsByWorker(selectedLogs);
+  const combined = grouped.map(g => combineWorkerLogs(g));
+
   const byGroup = {};
-  selectedLogs.forEach(l=>{
+  combined.forEach(l=>{
     const gid=l.groupId||'unknown';
     if(!byGroup[gid]) byGroup[gid]=[];
     byGroup[gid].push(l);
@@ -546,25 +631,31 @@ async function makeReport(type, specificDate=null){
     const group=groups.find(g=>g.id===gid);
     const gname=group?group.name:gid;
     report+=`=== GROUP: ${gname} ===\n`;
-    report+=`Entries: ${entries.length}\n`;
+    report+=`Workers: ${entries.length}\n`;
     const totalM=sum(entries,'rMale'), totalF=sum(entries,'rFemale'), totalW=sum(entries,'rWeaners'), totalK=sum(entries,'rKits');
-    report+=`Rabbits met: M:${totalM}, F:${totalF}, W:${totalW}, K:${totalK}\n`;
+    report+=`Total rabbits met: M:${totalM}, F:${totalF}, W:${totalW}, K:${totalK}\n`;
     report+=`Bought: M:${sum(entries,'boughtAdultMale')}, F:${sum(entries,'boughtAdultFemale')}, W:${sum(entries,'boughtWeaners')}, K:${sum(entries,'boughtKits')}\n`;
     report+=`Sold: ${sum(entries,'rabbitsSold')}\n`;
     report+=`New Kits: ${sum(entries,'newKits')}\n`;
-    report+=`Deaths: ${sum(entries,'deaths')}\n`;
-    entries.forEach((l,i)=>{
-      const feedT = treatmentLabel(l.feedTreatment);
-      const weightT = treatmentLabel(l.weightTreatment);
-      report+=`  Entry ${i+1} (${l.workerName}) — Feed: ${feedT}, Weight: ${weightT}\n`;
-      report+=`    Water: ${l.waterLitres||0}L\n`;
-      report+=`    Feed per rabbit (${feedT}): ${formatFeedEntriesFull(l.feedEntries, l.feedTreatment)}\n`;
-      report+=`    Weight per rabbit (${weightT}): ${formatWeightEntriesFull(l.weightEntries, l.weightTreatment)}\n`;
-      report+=`    Litters/Kits: ${formatLitterEntriesFull(l.litterEntries)}\n`;
-      report+=`    Deaths: ${formatDeathEntriesFull(l.deathEntries)}\n`;
+    report+=`Deaths: ${sum(entries,'deaths')}\n\n`;
+    entries.forEach(l=>{
+      report+=`  Worker: ${l.workerName}\n`;
+      report+=`    Males:${l.rMale}, Females:${l.rFemale}, Weaners:${l.rWeaners}, Kits:${l.rKits}\n`;
+      l.treatments.forEach(t=>{
+        const feedT = treatmentLabel(t.feedTreatment);
+        const weightT = treatmentLabel(t.weightTreatment);
+        report+=`    ${feedT} / ${weightT}:\n`;
+        report+=`      Water: ${t.waterLitres}L\n`;
+        report+=`      Feed: ${formatFeedEntriesFull(t.feedEntries, t.feedTreatment)}\n`;
+        report+=`      Weight: ${formatWeightEntriesFull(t.weightEntries, t.weightTreatment)}\n`;
+      });
+      const allLitter = l.treatments.flatMap(t => t.litterEntries || []);
+      const allDeath = l.treatments.flatMap(t => t.deathEntries || []);
+      if(allLitter.length) report+=`    Litters/Kits: ${formatLitterEntriesFull(allLitter)}\n`;
+      if(allDeath.length) report+=`    Deaths: ${formatDeathEntriesFull(allDeath)}\n`;
       if(l.matingDate) report+=`    Mating: ${l.matingDate}\n`;
+      report+='\n';
     });
-    report+='\n';
   }
   document.getElementById('reportText').textContent=report;
   document.getElementById('reportBox').classList.remove('hidden');
