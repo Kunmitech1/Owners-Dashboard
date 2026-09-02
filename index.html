@@ -9,6 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-database-compat.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
+/* (same as before – keep compact) */
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--primary:#6366f1;--primary-light:#818cf8;--primary-dark:#4338ca;--success:#10b981;--warning:#f59e0b;--danger:#ef4444;--rose:#f43f5e;--bg:#f8fafc;--card:#ffffff;--border:#e2e8f0;--text:#0f172a;--slate:#64748b;--shadow:0 4px 12px rgba(0,0,0,0.06)}
 body{font-family:'Inter',sans-serif;background:var(--bg);min-height:100vh;color:var(--text)}
@@ -92,15 +93,10 @@ body{font-family:'Inter',sans-serif;background:var(--bg);min-height:100vh;color:
 .total-label{font-size:0.68rem;opacity:0.8;margin-top:6px;font-weight:600;line-height:1.2}
 .entry-detail-block{background:#f8fafc;border-radius:10px;padding:10px;margin-top:6px;font-size:0.8rem;border-left:3px solid var(--primary)}
 .entry-detail-block strong{color:var(--text)}
-.rabbit-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;font-size:0.7rem;margin-top:4px}
-.rabbit-grid .rabbit-item{background:#fff;border:1px solid var(--border);border-radius:6px;padding:4px;text-align:center}
-.rabbit-item .label{font-weight:700;color:var(--slate)}
-.rabbit-item .value{font-weight:800;color:var(--text)}
 </style>
 </head>
 <body>
 <div class="app">
-
 <div class="header">
   <div class="header-top"><div class="header-icon">🏠</div><h1>Owner Dashboard</h1></div>
   <div class="header-date" id="headerDate">Loading…</div>
@@ -191,7 +187,6 @@ body{font-family:'Inter',sans-serif;background:var(--bg);min-height:100vh;color:
     </div>
   </div>
 </div>
-
 </div>
 
 <div class="bottom-nav">
@@ -215,6 +210,15 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
+// Correct rabbit mapping (20 rabbits, 4 treatments)
+const TREATMENT_RABBITS = {
+  control: [1,2,3,4],
+  t1: [5,6,7,8],
+  t2: [9,10,11,12],
+  t3: [13,14,15,16],
+  t4: [17,18,19,20]
+};
+
 const RANGE_DAYS = { '1W':7, '2W':14, '1M':30, '3M':90, '6M':180, '1Y':365 };
 function todayStr(){ return new Date().toDateString(); }
 function fmt(n){ return Number(n).toLocaleString(); }
@@ -228,27 +232,26 @@ var waterRange='daily';
 var analyticsGroup='all';
 var lastReportType='daily';
 
-// ----- Helper: format per‑rabbit arrays (all rabbits, no mapping) -----
-function formatFeedEntriesAll(feedEntries){
-  if(!feedEntries || !feedEntries.length) return '—';
-  // Sort by rabbit number
-  const sorted = [...feedEntries].sort((a,b) => a.rabbit - b.rabbit);
-  return sorted.map(e => `R${e.rabbit}: ${e.feedGrams}g`).join(', ');
+// ----- Helper: format per‑rabbit arrays using treatment mapping -----
+function formatFeedEntriesFull(feedEntries, treatment){
+  const rabbits = TREATMENT_RABBITS[treatment] || [];
+  const map = {};
+  (feedEntries || []).forEach(e => { map[e.rabbit] = e.feedGrams; });
+  return rabbits.map(r => `R${r}: ${map[r] || 0}g`).join(', ');
 }
-function formatWeightEntriesAll(weightEntries){
-  if(!weightEntries || !weightEntries.length) return '—';
-  const sorted = [...weightEntries].sort((a,b) => a.rabbit - b.rabbit);
-  return sorted.map(e => `R${e.rabbit}: ${e.weightKg}kg`).join(', ');
+function formatWeightEntriesFull(weightEntries, treatment){
+  const rabbits = TREATMENT_RABBITS[treatment] || [];
+  const map = {};
+  (weightEntries || []).forEach(e => { map[e.rabbit] = e.weightKg; });
+  return rabbits.map(r => `R${r}: ${map[r] || 0}kg`).join(', ');
 }
-function formatLitterEntriesAll(litterEntries){
+function formatLitterEntriesFull(litterEntries){
   if(!litterEntries || !litterEntries.length) return '—';
-  const sorted = [...litterEntries].sort((a,b) => a.rabbit - b.rabbit);
-  return sorted.map(e => `R${e.rabbit}: ${e.litters} lits, ${e.kits} kits`).join('; ');
+  return litterEntries.map(e => `R${e.rabbit}: ${e.litters} lits, ${e.kits} kits`).join('; ');
 }
-function formatDeathEntriesAll(deathEntries){
+function formatDeathEntriesFull(deathEntries){
   if(!deathEntries || !deathEntries.length) return '—';
-  const sorted = [...deathEntries].sort((a,b) => a.rabbit - b.rabbit);
-  return sorted.map(e => `${e.category} R${e.rabbit}: ${e.count}`).join('; ');
+  return deathEntries.map(e => `${e.category} R${e.rabbit}: ${e.count}`).join('; ');
 }
 
 // ----- Overview (enhanced) -----
@@ -295,7 +298,6 @@ function updateOverview(){
 
 function filterGroup(id){ activeGroupFilter=id; updateOverview(); }
 
-// Renders each log entry with full rabbit details (all rabbits from arrays)
 function renderGroupView(groups, tl){
   const target=activeGroupFilter==='all'?groups:groups.filter(g=>g.id===activeGroupFilter);
   if(!target.length){ document.getElementById('groupView').innerHTML='<div class="empty-state">No groups.</div>'; return; }
@@ -321,10 +323,10 @@ function renderGroupView(groups, tl){
             ${l.deliveryDate?` | Delivered:${l.deliveryDate}`:''}
           </div>
           <div class="entry-detail-block">
-            <strong>🌾 Feed per rabbit (${feedT}):</strong> ${formatFeedEntriesAll(l.feedEntries)}<br>
-            <strong>⚖️ Weight per rabbit (${weightT}):</strong> ${formatWeightEntriesAll(l.weightEntries)}<br>
-            <strong>🐣 Litters/Kits:</strong> ${formatLitterEntriesAll(l.litterEntries)}<br>
-            <strong>💀 Deaths:</strong> ${formatDeathEntriesAll(l.deathEntries)}
+            <strong>🌾 Feed per rabbit (${feedT}):</strong> ${formatFeedEntriesFull(l.feedEntries, l.feedTreatment)}<br>
+            <strong>⚖️ Weight per rabbit (${weightT}):</strong> ${formatWeightEntriesFull(l.weightEntries, l.weightTreatment)}<br>
+            <strong>🐣 Litters/Kits:</strong> ${formatLitterEntriesFull(l.litterEntries)}<br>
+            <strong>💀 Deaths:</strong> ${formatDeathEntriesFull(l.deathEntries)}
           </div>
           <div class="data-row-detail" style="font-size:0.7rem;color:var(--slate)">${new Date(l.date).toLocaleString()}</div>
         </div>`;
@@ -357,10 +359,10 @@ function renderRecentActivity(){
       let details=`Males: ${l.rMale||0}, Females: ${l.rFemale||0}, Weaners: ${l.rWeaners||0}, Kits: ${l.rKits||0}`;
       details+=` | Bought: M:${l.boughtAdultMale||0}, F:${l.boughtAdultFemale||0}, W:${l.boughtWeaners||0}, K:${l.boughtKits||0} | Sold: ${l.rabbitsSold||0}`;
       details+=` | Water: ${l.waterLitres||0}L`;
-      details+=` | Feed per rabbit (${feedT}): ${formatFeedEntriesAll(l.feedEntries)}`;
-      details+=` | Weight per rabbit (${weightT}): ${formatWeightEntriesAll(l.weightEntries)}`;
-      details+=` | Litters/Kits: ${formatLitterEntriesAll(l.litterEntries)}`;
-      details+=` | Deaths: ${formatDeathEntriesAll(l.deathEntries)}`;
+      details+=` | Feed per rabbit (${feedT}): ${formatFeedEntriesFull(l.feedEntries, l.feedTreatment)}`;
+      details+=` | Weight per rabbit (${weightT}): ${formatWeightEntriesFull(l.weightEntries, l.weightTreatment)}`;
+      details+=` | Litters/Kits: ${formatLitterEntriesFull(l.litterEntries)}`;
+      details+=` | Deaths: ${formatDeathEntriesFull(l.deathEntries)}`;
       if(l.matingDate) details+=` | Mating: ${l.matingDate}`;
       return `<div class="timeline-item"><div class="t-dot ${l.deaths>0?'danger':''}"></div><div class="t-body"><div class="t-title">🐇 ${desc}</div><div class="t-desc">${details}</div><div style="font-size:0.7rem;color:var(--slate);margin-top:2px">${grpName}</div></div><div class="t-time"><div>${d}</div><div>${t}</div></div></div>`;
     }).join('') || '<div class="empty-state">No recent rabbit farm activity.</div>';
@@ -402,7 +404,6 @@ async function updateAnalytics(){
   });
   drawMortalityChart(mortalityData);
 
-  // Weight chart: average weight per treatment (using treatment from log)
   const weightByTreatment = {};
   groupLogs.forEach(l=>{
     if(l.weightEntries && l.weightEntries.length){
@@ -412,7 +413,6 @@ async function updateAnalytics(){
         weightByTreatment[treat].push(w.weightKg);
       });
     } else {
-      // fallback to old fields if no weightEntries
       const treatments = ['control','t1','t2','t3','t4'];
       treatments.forEach(t=>{
         const key = t==='control' ? 'weightControl' : `weightTreatment${t.slice(1)}`;
@@ -558,10 +558,10 @@ async function makeReport(type, specificDate=null){
       const weightT = treatmentLabel(l.weightTreatment);
       report+=`  Entry ${i+1} (${l.workerName}) — Feed: ${feedT}, Weight: ${weightT}\n`;
       report+=`    Water: ${l.waterLitres||0}L\n`;
-      report+=`    Feed per rabbit (${feedT}): ${formatFeedEntriesAll(l.feedEntries)}\n`;
-      report+=`    Weight per rabbit (${weightT}): ${formatWeightEntriesAll(l.weightEntries)}\n`;
-      report+=`    Litters/Kits: ${formatLitterEntriesAll(l.litterEntries)}\n`;
-      report+=`    Deaths: ${formatDeathEntriesAll(l.deathEntries)}\n`;
+      report+=`    Feed per rabbit (${feedT}): ${formatFeedEntriesFull(l.feedEntries, l.feedTreatment)}\n`;
+      report+=`    Weight per rabbit (${weightT}): ${formatWeightEntriesFull(l.weightEntries, l.weightTreatment)}\n`;
+      report+=`    Litters/Kits: ${formatLitterEntriesFull(l.litterEntries)}\n`;
+      report+=`    Deaths: ${formatDeathEntriesFull(l.deathEntries)}\n`;
       if(l.matingDate) report+=`    Mating: ${l.matingDate}\n`;
     });
     report+='\n';
