@@ -9,6 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-database-compat.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
+/* (your existing styles – keep them unchanged) */
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--primary:#6366f1;--primary-light:#818cf8;--primary-dark:#4338ca;--success:#10b981;--warning:#f59e0b;--danger:#ef4444;--rose:#f43f5e;--bg:#f8fafc;--card:#ffffff;--border:#e2e8f0;--text:#0f172a;--slate:#64748b;--shadow:0 4px 12px rgba(0,0,0,0.06)}
 body{font-family:'Inter',sans-serif;background:var(--bg);min-height:100vh;color:var(--text)}
@@ -220,10 +221,12 @@ const TREATMENT_RABBITS = {
 };
 
 const RANGE_DAYS = { '1W':7, '2W':14, '1M':30, '3M':90, '6M':180, '1Y':365 };
-function todayStr(){ return new Date().toDateString(); }
 function fmt(n){ return Number(n).toLocaleString(); }
 function sum(arr,key){ return arr.reduce((s,l)=>s+(parseFloat(l[key])||0),0); }
 function treatmentLabel(t){ return t ? t.charAt(0).toUpperCase()+t.slice(1) : '—'; }
+
+// ----- Use ISO date string for consistent grouping -----
+function todayISO(){ return new Date().toISOString().split('T')[0]; }
 
 var activeGroupFilter='all';
 var charts={};
@@ -254,7 +257,7 @@ function formatDeathEntriesFull(deathEntries){
   return deathEntries.map(e => `${e.category} R${e.rabbit}: ${e.count}`).join('; ');
 }
 
-// ----- Group logs by (date, groupId, workerName) and combine -----
+// ----- Group logs by (date, groupId, workerName) using ISO date -----
 function groupLogsByWorker(logs){
   const groups = {};
   logs.forEach(l => {
@@ -275,7 +278,6 @@ function groupLogsByWorker(logs){
 
 function combineWorkerLogs(group){
   const entries = group.entries;
-  // Combine totals
   const combined = {
     date: group.date,
     groupId: group.groupId,
@@ -296,7 +298,6 @@ function combineWorkerLogs(group){
     matingDate: entries.find(e => e.matingDate)?.matingDate || null,
     edd: entries.find(e => e.edd)?.edd || null,
     deliveryDate: entries.find(e => e.deliveryDate)?.deliveryDate || null,
-    // Treatments: collect all treatments from entries
     treatments: entries.map(e => ({
       feedTreatment: e.feedTreatment,
       weightTreatment: e.weightTreatment,
@@ -313,7 +314,8 @@ function combineWorkerLogs(group){
 // ----- Overview (enhanced) -----
 function updateOverview(){
   Promise.all([getLogs(),getGroups(),getWorkers()]).then(([logs,groups,workers])=>{
-    const todayLogs = logs.filter(l => new Date(l.date).toDateString() === todayStr() && l.farm === 'rabbit');
+    const today = todayISO();
+    const todayLogs = logs.filter(l => l.date.split('T')[0] === today && l.farm === 'rabbit');
     const grouped = groupLogsByWorker(todayLogs);
     const combinedLogs = grouped.map(g => combineWorkerLogs(g));
 
@@ -423,7 +425,6 @@ function totalItem(num,label){ return `<div class="total-item"><div class="total
 // ----- Activity (enhanced) -----
 function renderRecentActivity(){
   Promise.all([getLogs(),getGroups()]).then(([logs,groups])=>{
-    // Group logs by date/group/worker for activity too
     const grouped = groupLogsByWorker(logs.filter(l => l.farm === 'rabbit'));
     const combined = grouped.map(g => combineWorkerLogs(g)).slice(0,20);
     let recentHtml=combined.map(l=>{
@@ -435,7 +436,6 @@ function renderRecentActivity(){
       let details=`Males: ${l.rMale}, Females: ${l.rFemale}, Weaners: ${l.rWeaners}, Kits: ${l.rKits}`;
       details+=` | Bought: M:${l.boughtAdultMale}, F:${l.boughtAdultFemale}, W:${l.boughtWeaners}, K:${l.boughtKits} | Sold: ${l.rabbitsSold}`;
       details+=` | Total Water: ${l.treatments.reduce((s,t)=>s+t.waterLitres,0)}L`;
-      // Show each treatment
       l.treatments.forEach(t => {
         const feedT = treatmentLabel(t.feedTreatment);
         details+=` | ${feedT} Feed: ${formatFeedEntriesFull(t.feedEntries, t.feedTreatment)}`;
