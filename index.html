@@ -92,6 +92,10 @@ body{font-family:'Inter',sans-serif;background:var(--bg);min-height:100vh;color:
 .total-label{font-size:0.68rem;opacity:0.8;margin-top:6px;font-weight:600;line-height:1.2}
 .entry-detail-block{background:#f8fafc;border-radius:10px;padding:10px;margin-top:6px;font-size:0.8rem;border-left:3px solid var(--primary)}
 .entry-detail-block strong{color:var(--text)}
+.rabbit-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;font-size:0.7rem;margin-top:4px}
+.rabbit-grid .rabbit-item{background:#fff;border:1px solid var(--border);border-radius:6px;padding:4px;text-align:center}
+.rabbit-item .label{font-weight:700;color:var(--slate)}
+.rabbit-item .value{font-weight:800;color:var(--text)}
 </style>
 </head>
 <body>
@@ -211,10 +215,20 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
+// Treatment rabbit mapping (same as worker app)
+const TREATMENT_RABBITS = {
+  control: [1,2,3,4],
+  t1: [5,6,7,8],
+  t2: [9,10,11,12],
+  t3: [13,14,15,16],
+  t4: [17,18,19,20]
+};
+
 const RANGE_DAYS = { '1W':7, '2W':14, '1M':30, '3M':90, '6M':180, '1Y':365 };
 function todayStr(){ return new Date().toDateString(); }
 function fmt(n){ return Number(n).toLocaleString(); }
 function sum(arr,key){ return arr.reduce((s,l)=>s+(parseFloat(l[key])||0),0); }
+function treatmentLabel(t){ return t ? t.charAt(0).toUpperCase()+t.slice(1) : '—'; }
 
 var activeGroupFilter='all';
 var charts={};
@@ -223,119 +237,37 @@ var waterRange='daily';
 var analyticsGroup='all';
 var lastReportType='daily';
 
-// Helper: format per‑rabbit arrays with labels
-function formatFeedEntries(feedEntries){
-  if(!feedEntries || !feedEntries.length) return '—';
-  return feedEntries.map(e => `R${e.rabbit}: ${e.feedGrams}g`).join(', ');
+// ----- Helper: format per-rabbit arrays with full treatment list -----
+function formatFeedEntriesFull(feedEntries, treatment){
+  const rabbits = TREATMENT_RABBITS[treatment] || [];
+  const map = {};
+  (feedEntries || []).forEach(e => { map[e.rabbit] = e.feedGrams; });
+  return rabbits.map(r => {
+    const val = map[r] || 0;
+    return `R${r}: ${val}g`;
+  }).join(', ');
 }
-function formatWeightEntries(weightEntries){
-  if(!weightEntries || !weightEntries.length) return '—';
-  return weightEntries.map(e => `R${e.rabbit}: ${e.weightKg}kg`).join(', ');
+
+function formatWeightEntriesFull(weightEntries, treatment){
+  const rabbits = TREATMENT_RABBITS[treatment] || [];
+  const map = {};
+  (weightEntries || []).forEach(e => { map[e.rabbit] = e.weightKg; });
+  return rabbits.map(r => {
+    const val = map[r] || 0;
+    return `R${r}: ${val}kg`;
+  }).join(', ');
 }
-function formatLitterEntries(litterEntries){
+
+function formatLitterEntriesFull(litterEntries){
   if(!litterEntries || !litterEntries.length) return '—';
   return litterEntries.map(e => `R${e.rabbit}: ${e.litters} lits, ${e.kits} kits`).join('; ');
 }
-function formatDeathEntries(deathEntries){
+function formatDeathEntriesFull(deathEntries){
   if(!deathEntries || !deathEntries.length) return '—';
   return deathEntries.map(e => `${e.category} R${e.rabbit}: ${e.count}`).join('; ');
 }
-// Treatment label
-function treatmentLabel(t){ return t ? t.charAt(0).toUpperCase()+t.slice(1) : '—'; }
 
-function init(){
-  document.getElementById('headerDate').textContent=
-    new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
-  document.getElementById('reportDate').value = new Date().toISOString().split('T')[0];
-
-  db.ref('logs').on('value', snap=>{
-    updateOverview();
-    if(!document.getElementById('tab-activity').classList.contains('hidden')) renderRecentActivity();
-    if(!document.getElementById('tab-analytics').classList.contains('hidden')) updateAnalytics();
-  });
-  db.ref('groups').on('value', snap=>{
-    renderGroupManage();
-    updateOverview();
-    renderAnalyticsGroupTabs();
-    if(!document.getElementById('tab-activity').classList.contains('hidden')) renderRecentActivity();
-  });
-  db.ref('workers').on('value', snap=>{
-    renderGroupManage();
-    if(!document.getElementById('tab-overview').classList.contains('hidden')) updateOverview();
-  });
-
-  updateOverview();
-  renderGroupManage();
-  renderAnalyticsGroupTabs();
-  renderRecentActivity();
-}
-
-async function getLogs(){ const s=await db.ref('logs').once('value'); return s.val()?Object.values(s.val()):[]; }
-async function getGroups(){ const s=await db.ref('groups').once('value'); return s.val()?Object.values(s.val()):[]; }
-async function getWorkers(){ const s=await db.ref('workers').once('value'); return s.val()?Object.values(s.val()):[]; }
-
-async function addGroup(){
-  const name=document.getElementById('newGroupName').value.trim();
-  const pin=document.getElementById('newGroupPin').value.trim();
-  if(!name||!pin){alert('Enter group name and PIN');return;}
-  const id='g'+Date.now();
-  try{
-    await db.ref('groups/'+id).set({id,name,pin});
-    document.getElementById('newGroupName').value='';
-    document.getElementById('newGroupPin').value='';
-    renderGroupManage();
-    renderAnalyticsGroupTabs();
-  }catch(e){alert('Failed to add group');console.error(e);}
-}
-async function deleteGroup(id){
-  if(!confirm('Delete group and workers?'))return;
-  const snap=await db.ref('workers').once('value');
-  if(snap.val()) Object.entries(snap.val()).forEach(async([k,w])=>{if(w.groupId===id) await db.ref('workers/'+k).remove();});
-  await db.ref('groups/'+id).remove();
-  renderGroupManage();
-  renderAnalyticsGroupTabs();
-}
-async function addWorker(){
-  const name=document.getElementById('newWorkerName').value.trim();
-  const gid=document.getElementById('workerGroupSelect').value;
-  if(!name||!gid){alert('Enter worker name and select group');return;}
-  const id='w'+Date.now();
-  await db.ref('workers/'+id).set({id,name,groupId:gid,initials:name.charAt(0).toUpperCase()});
-  document.getElementById('newWorkerName').value='';
-  renderGroupManage();
-}
-async function deleteWorker(id){
-  if(!confirm('Remove worker?'))return;
-  await db.ref('workers/'+id).remove();
-  renderGroupManage();
-}
-function renderGroupManage(){
-  Promise.all([getGroups(),getWorkers()]).then(([groups,workers])=>{
-    const sel=document.getElementById('workerGroupSelect');
-    sel.innerHTML='<option value="">Select group…</option>'+groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
-    document.getElementById('groupListManage').innerHTML=groups.length?groups.map(g=>`
-      <div class="worker-row"><div class="avatar-sm">G</div><div class="worker-info"><div class="worker-name">${g.name}</div><div class="worker-meta">PIN: ${g.pin} | ${workers.filter(w=>w.groupId===g.id).length} worker(s)</div></div><button class="remove-btn" onclick="deleteGroup('${g.id}')">🗑 Remove</button></div>`).join(''):'<div class="empty-state">No groups added.</div>';
-    document.getElementById('allWorkersList').innerHTML=workers.length?workers.map(w=>{
-      const grp=groups.find(g=>g.id===w.groupId);
-      return `<div class="worker-row"><div class="avatar-sm">${w.initials}</div><div class="worker-info"><div class="worker-name">${w.name}</div><div class="worker-meta">${grp?grp.name:'Unknown group'}</div></div><button class="remove-btn" onclick="deleteWorker('${w.id}')">🗑</button></div>`;
-    }).join(''):'<div class="empty-state">No workers added.</div>';
-  });
-}
-
-function renderAnalyticsGroupTabs(){
-  getGroups().then(groups=>{
-    const base=`<span class="group-tab ${analyticsGroup==='all'?'active':''}" onclick="setAnalyticsGroup('all')">All Groups</span>`;
-    const groupTabs=groups.map(g=>`<span class="group-tab ${analyticsGroup===g.id?'active':''}" onclick="setAnalyticsGroup('${g.id}')">${g.name}</span>`).join('');
-    ['mortalityGroupTabs','weightGroupTabs','salesGroupTabs','waterGroupTabs'].forEach(id=>document.getElementById(id).innerHTML=base+groupTabs);
-  });
-}
-function setAnalyticsGroup(id){
-  analyticsGroup=id;
-  renderAnalyticsGroupTabs();
-  if(!document.getElementById('tab-analytics').classList.contains('hidden')) updateAnalytics();
-}
-
-// ----- OVERVIEW (enhanced) -----
+// ----- Overview (enhanced group view) -----
 function updateOverview(){
   Promise.all([getLogs(),getGroups(),getWorkers()]).then(([logs,groups,workers])=>{
     const tl=logs.filter(l=>new Date(l.date).toDateString()===todayStr() && l.farm==='rabbit');
@@ -379,7 +311,7 @@ function updateOverview(){
 
 function filterGroup(id){ activeGroupFilter=id; updateOverview(); }
 
-// Enhanced group view: show treatment and all per‑rabbit data
+// Renders each log entry with full rabbit details
 function renderGroupView(groups, tl){
   const target=activeGroupFilter==='all'?groups:groups.filter(g=>g.id===activeGroupFilter);
   if(!target.length){ document.getElementById('groupView').innerHTML='<div class="empty-state">No groups.</div>'; return; }
@@ -405,10 +337,10 @@ function renderGroupView(groups, tl){
             ${l.deliveryDate?` | Delivered:${l.deliveryDate}`:''}
           </div>
           <div class="entry-detail-block">
-            <strong>🌾 Feed per rabbit:</strong> ${formatFeedEntries(l.feedEntries)}<br>
-            <strong>⚖️ Weight per rabbit:</strong> ${formatWeightEntries(l.weightEntries)}<br>
-            <strong>🐣 Litters/Kits:</strong> ${formatLitterEntries(l.litterEntries)}<br>
-            <strong>💀 Deaths:</strong> ${formatDeathEntries(l.deathEntries)}
+            <strong>🌾 Feed per rabbit (${feedT}):</strong> ${formatFeedEntriesFull(l.feedEntries, l.feedTreatment)}<br>
+            <strong>⚖️ Weight per rabbit (${weightT}):</strong> ${formatWeightEntriesFull(l.weightEntries, l.weightTreatment)}<br>
+            <strong>🐣 Litters/Kits:</strong> ${formatLitterEntriesFull(l.litterEntries)}<br>
+            <strong>💀 Deaths:</strong> ${formatDeathEntriesFull(l.deathEntries)}
           </div>
           <div class="data-row-detail" style="font-size:0.7rem;color:var(--slate)">${new Date(l.date).toLocaleString()}</div>
         </div>`;
@@ -427,7 +359,7 @@ function stat(cls,num,label,wide){
 }
 function totalItem(num,label){ return `<div class="total-item"><div class="total-num">${num}</div><div class="total-label">${label}</div></div>`; }
 
-// ----- ACTIVITY (enhanced) -----
+// ----- Activity (enhanced) -----
 function renderRecentActivity(){
   Promise.all([getLogs(),getGroups()]).then(([logs,groups])=>{
     let recentHtml=logs.slice().reverse().filter(l=>l.farm==='rabbit' && groups.some(g=>g.id===l.groupId)).slice(0,20).map(l=>{
@@ -441,10 +373,10 @@ function renderRecentActivity(){
       let details=`Males: ${l.rMale||0}, Females: ${l.rFemale||0}, Weaners: ${l.rWeaners||0}, Kits: ${l.rKits||0}`;
       details+=` | Bought: M:${l.boughtAdultMale||0}, F:${l.boughtAdultFemale||0}, W:${l.boughtWeaners||0}, K:${l.boughtKits||0} | Sold: ${l.rabbitsSold||0}`;
       details+=` | Water: ${l.waterLitres||0}L`;
-      details+=` | Feed per rabbit: ${formatFeedEntries(l.feedEntries)}`;
-      details+=` | Weight per rabbit: ${formatWeightEntries(l.weightEntries)}`;
-      details+=` | Litters/Kits: ${formatLitterEntries(l.litterEntries)}`;
-      details+=` | Deaths: ${formatDeathEntries(l.deathEntries)}`;
+      details+=` | Feed per rabbit (${feedT}): ${formatFeedEntriesFull(l.feedEntries, l.feedTreatment)}`;
+      details+=` | Weight per rabbit (${weightT}): ${formatWeightEntriesFull(l.weightEntries, l.weightTreatment)}`;
+      details+=` | Litters/Kits: ${formatLitterEntriesFull(l.litterEntries)}`;
+      details+=` | Deaths: ${formatDeathEntriesFull(l.deathEntries)}`;
       if(l.matingDate) details+=` | Mating: ${l.matingDate}`;
       return `<div class="timeline-item"><div class="t-dot ${l.deaths>0?'danger':''}"></div><div class="t-body"><div class="t-title">🐇 ${desc}</div><div class="t-desc">${details}</div><div style="font-size:0.7rem;color:var(--slate);margin-top:2px">${grpName}</div></div><div class="t-time"><div>${d}</div><div>${t}</div></div></div>`;
     }).join('') || '<div class="empty-state">No recent rabbit farm activity.</div>';
@@ -452,8 +384,7 @@ function renderRecentActivity(){
   });
 }
 
-// ----- ANALYTICS (unchanged except using new fields for treatment) -----
-// (We keep the analytics logic as before; it already uses feedEntries/weightEntries etc.)
+// ----- Analytics (unchanged, uses existing helpers) -----
 function setRange(range){ activeRange=range; document.querySelectorAll('.range-tab').forEach(b=>b.classList.remove('active')); document.querySelector(`.range-tab[onclick="setRange('${range}')"]`).classList.add('active'); updateAnalytics(); }
 function setWaterRange(r){ waterRange=r; updateWaterChart(); }
 
@@ -465,7 +396,6 @@ async function updateAnalytics(){
   const targetGroup=analyticsGroup;
   const groupLogs=targetGroup==='all'?filtered:filtered.filter(l=>l.groupId===targetGroup);
 
-  // KPI
   const totalRabbits=sum(groupLogs,'rMale')+sum(groupLogs,'rFemale')+sum(groupLogs,'rWeaners')+sum(groupLogs,'rKits');
   const totalDeaths=sum(groupLogs,'deaths');
   const totalSold=sum(groupLogs,'rabbitsSold');
@@ -473,7 +403,6 @@ async function updateAnalytics(){
   document.getElementById('weeklyKPI').innerHTML=
     stat('blue',totalRabbits,'Rabbits Met')+stat('red',totalDeaths,'Deaths')+stat('green',totalSold,'Sold')+stat('amber',totalNewKits,'New Kits');
 
-  // Mortality chart: aggregate deaths by category from deathEntries
   const mortalityData = { male:0, female:0, weaner:0, kit:0 };
   groupLogs.forEach(l=>{
     if(l.deathEntries && l.deathEntries.length){
@@ -489,13 +418,12 @@ async function updateAnalytics(){
   });
   drawMortalityChart(mortalityData);
 
-  // Weight chart: average weight per treatment from weightEntries
   const weightByTreatment = { control:[], t1:[], t2:[], t3:[], t4:[] };
   groupLogs.forEach(l=>{
     if(l.weightEntries && l.weightEntries.length){
       l.weightEntries.forEach(w=>{
         let treat = null;
-        for(const [key, rabbits] of Object.entries({ control:[1,2,3,4], t1:[5,6,7,8], t2:[9,10,11,12], t3:[13,14,15,16], t4:[17,18,19,20] })){
+        for(const [key, rabbits] of Object.entries(TREATMENT_RABBITS)){
           if(rabbits.includes(parseInt(w.rabbit))){ treat=key; break; }
         }
         if(treat && weightByTreatment[treat]) weightByTreatment[treat].push(w.weightKg);
@@ -515,7 +443,6 @@ async function updateAnalytics(){
   }
   drawWeightChart(avgWeight);
 
-  // Sales chart
   const salesByDate = {};
   groupLogs.forEach(l=>{
     const d=new Date(l.date).toDateString();
@@ -523,7 +450,6 @@ async function updateAnalytics(){
     salesByDate[d]+=(l.rabbitsSold||0);
   });
   drawSalesChart(salesByDate);
-
   updateWaterChart();
 }
 
@@ -600,7 +526,7 @@ async function updateWaterChart(){
   });
 }
 
-// ----- REPORTS (enhanced) -----
+// ----- Reports (enhanced) -----
 async function makeReport(type, specificDate=null){
   const logs=await getLogs();
   const groups=await getGroups();
@@ -640,16 +566,15 @@ async function makeReport(type, specificDate=null){
     report+=`Sold: ${sum(entries,'rabbitsSold')}\n`;
     report+=`New Kits: ${sum(entries,'newKits')}\n`;
     report+=`Deaths: ${sum(entries,'deaths')}\n`;
-    // Per entry details
     entries.forEach((l,i)=>{
       const feedT = treatmentLabel(l.feedTreatment);
       const weightT = treatmentLabel(l.weightTreatment);
       report+=`  Entry ${i+1} (${l.workerName}) — Feed: ${feedT}, Weight: ${weightT}\n`;
       report+=`    Water: ${l.waterLitres||0}L\n`;
-      report+=`    Feed per rabbit: ${formatFeedEntries(l.feedEntries)}\n`;
-      report+=`    Weight per rabbit: ${formatWeightEntries(l.weightEntries)}\n`;
-      report+=`    Litters/Kits: ${formatLitterEntries(l.litterEntries)}\n`;
-      report+=`    Deaths: ${formatDeathEntries(l.deathEntries)}\n`;
+      report+=`    Feed per rabbit (${feedT}): ${formatFeedEntriesFull(l.feedEntries, l.feedTreatment)}\n`;
+      report+=`    Weight per rabbit (${weightT}): ${formatWeightEntriesFull(l.weightEntries, l.weightTreatment)}\n`;
+      report+=`    Litters/Kits: ${formatLitterEntriesFull(l.litterEntries)}\n`;
+      report+=`    Deaths: ${formatDeathEntriesFull(l.deathEntries)}\n`;
       if(l.matingDate) report+=`    Mating: ${l.matingDate}\n`;
     });
     report+='\n';
@@ -672,6 +597,72 @@ function shareWhatsApp(){
   window.open('https://wa.me/?text='+message, '_blank');
 }
 
+// ----- Groups & Workers management (unchanged) -----
+async function getLogs(){ const s=await db.ref('logs').once('value'); return s.val()?Object.values(s.val()):[]; }
+async function getGroups(){ const s=await db.ref('groups').once('value'); return s.val()?Object.values(s.val()):[]; }
+async function getWorkers(){ const s=await db.ref('workers').once('value'); return s.val()?Object.values(s.val()):[]; }
+
+async function addGroup(){
+  const name=document.getElementById('newGroupName').value.trim();
+  const pin=document.getElementById('newGroupPin').value.trim();
+  if(!name||!pin){alert('Enter group name and PIN');return;}
+  const id='g'+Date.now();
+  try{
+    await db.ref('groups/'+id).set({id,name,pin});
+    document.getElementById('newGroupName').value='';
+    document.getElementById('newGroupPin').value='';
+    renderGroupManage();
+    renderAnalyticsGroupTabs();
+  }catch(e){alert('Failed to add group');console.error(e);}
+}
+async function deleteGroup(id){
+  if(!confirm('Delete group and workers?'))return;
+  const snap=await db.ref('workers').once('value');
+  if(snap.val()) Object.entries(snap.val()).forEach(async([k,w])=>{if(w.groupId===id) await db.ref('workers/'+k).remove();});
+  await db.ref('groups/'+id).remove();
+  renderGroupManage();
+  renderAnalyticsGroupTabs();
+}
+async function addWorker(){
+  const name=document.getElementById('newWorkerName').value.trim();
+  const gid=document.getElementById('workerGroupSelect').value;
+  if(!name||!gid){alert('Enter worker name and select group');return;}
+  const id='w'+Date.now();
+  await db.ref('workers/'+id).set({id,name,groupId:gid,initials:name.charAt(0).toUpperCase()});
+  document.getElementById('newWorkerName').value='';
+  renderGroupManage();
+}
+async function deleteWorker(id){
+  if(!confirm('Remove worker?'))return;
+  await db.ref('workers/'+id).remove();
+  renderGroupManage();
+}
+function renderGroupManage(){
+  Promise.all([getGroups(),getWorkers()]).then(([groups,workers])=>{
+    const sel=document.getElementById('workerGroupSelect');
+    sel.innerHTML='<option value="">Select group…</option>'+groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
+    document.getElementById('groupListManage').innerHTML=groups.length?groups.map(g=>`
+      <div class="worker-row"><div class="avatar-sm">G</div><div class="worker-info"><div class="worker-name">${g.name}</div><div class="worker-meta">PIN: ${g.pin} | ${workers.filter(w=>w.groupId===g.id).length} worker(s)</div></div><button class="remove-btn" onclick="deleteGroup('${g.id}')">🗑 Remove</button></div>`).join(''):'<div class="empty-state">No groups added.</div>';
+    document.getElementById('allWorkersList').innerHTML=workers.length?workers.map(w=>{
+      const grp=groups.find(g=>g.id===w.groupId);
+      return `<div class="worker-row"><div class="avatar-sm">${w.initials}</div><div class="worker-info"><div class="worker-name">${w.name}</div><div class="worker-meta">${grp?grp.name:'Unknown group'}</div></div><button class="remove-btn" onclick="deleteWorker('${w.id}')">🗑</button></div>`;
+    }).join(''):'<div class="empty-state">No workers added.</div>';
+  });
+}
+
+function renderAnalyticsGroupTabs(){
+  getGroups().then(groups=>{
+    const base=`<span class="group-tab ${analyticsGroup==='all'?'active':''}" onclick="setAnalyticsGroup('all')">All Groups</span>`;
+    const groupTabs=groups.map(g=>`<span class="group-tab ${analyticsGroup===g.id?'active':''}" onclick="setAnalyticsGroup('${g.id}')">${g.name}</span>`).join('');
+    ['mortalityGroupTabs','weightGroupTabs','salesGroupTabs','waterGroupTabs'].forEach(id=>document.getElementById(id).innerHTML=base+groupTabs);
+  });
+}
+function setAnalyticsGroup(id){
+  analyticsGroup=id;
+  renderAnalyticsGroupTabs();
+  if(!document.getElementById('tab-analytics').classList.contains('hidden')) updateAnalytics();
+}
+
 // ----- Tab navigation -----
 function showTab(tab){
   ['overview','groups','analytics','activity','reports'].forEach(t=>{
@@ -684,6 +675,34 @@ function showTab(tab){
   document.querySelector(`.bottom-nav button[onclick="showTab('${tab}')"]`).classList.add('active');
   if(tab==='activity') renderRecentActivity();
   if(tab==='analytics') updateAnalytics();
+}
+
+// ----- Init -----
+function init(){
+  document.getElementById('headerDate').textContent=
+    new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  document.getElementById('reportDate').value = new Date().toISOString().split('T')[0];
+
+  db.ref('logs').on('value', snap=>{
+    updateOverview();
+    if(!document.getElementById('tab-activity').classList.contains('hidden')) renderRecentActivity();
+    if(!document.getElementById('tab-analytics').classList.contains('hidden')) updateAnalytics();
+  });
+  db.ref('groups').on('value', snap=>{
+    renderGroupManage();
+    updateOverview();
+    renderAnalyticsGroupTabs();
+    if(!document.getElementById('tab-activity').classList.contains('hidden')) renderRecentActivity();
+  });
+  db.ref('workers').on('value', snap=>{
+    renderGroupManage();
+    if(!document.getElementById('tab-overview').classList.contains('hidden')) updateOverview();
+  });
+
+  updateOverview();
+  renderGroupManage();
+  renderAnalyticsGroupTabs();
+  renderRecentActivity();
 }
 
 init();
