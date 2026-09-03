@@ -9,7 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-database-compat.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-/* (your existing styles – keep them unchanged) */
+/* (your existing styles – keep unchanged) */
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--primary:#6366f1;--primary-light:#818cf8;--primary-dark:#4338ca;--success:#10b981;--warning:#f59e0b;--danger:#ef4444;--rose:#f43f5e;--bg:#f8fafc;--card:#ffffff;--border:#e2e8f0;--text:#0f172a;--slate:#64748b;--shadow:0 4px 12px rgba(0,0,0,0.06)}
 body{font-family:'Inter',sans-serif;background:var(--bg);min-height:100vh;color:var(--text)}
@@ -225,7 +225,7 @@ function fmt(n){ return Number(n).toLocaleString(); }
 function sum(arr,key){ return arr.reduce((s,l)=>s+(parseFloat(l[key])||0),0); }
 function treatmentLabel(t){ return t ? t.charAt(0).toUpperCase()+t.slice(1) : '—'; }
 
-// ----- Use ISO date string for consistent grouping -----
+// Use ISO date for consistent grouping
 function todayISO(){ return new Date().toISOString().split('T')[0]; }
 
 var activeGroupFilter='all';
@@ -235,26 +235,18 @@ var waterRange='daily';
 var analyticsGroup='all';
 var lastReportType='daily';
 
-// ----- Helper: format per‑rabbit arrays using treatment mapping -----
-function formatFeedEntriesFull(feedEntries, treatment){
-  const rabbits = TREATMENT_RABBITS[treatment] || [];
-  const map = {};
-  (feedEntries || []).forEach(e => { map[e.rabbit] = e.feedGrams; });
-  return rabbits.map(r => `R${r}: ${map[r] || 0}g`).join(', ');
+// Helper: format feed entries for a given list of rabbit numbers
+function formatFeedForRabbits(feedEntries, rabbitList) {
+  if (!feedEntries || feedEntries.length === 0) return '—';
+  const filtered = feedEntries.filter(e => rabbitList.includes(e.rabbit));
+  if (filtered.length === 0) return '—';
+  return filtered.map(e => `R${e.rabbit}: ${e.feedGrams}g`).join(', ');
 }
-function formatWeightEntriesFull(weightEntries, treatment){
-  const rabbits = TREATMENT_RABBITS[treatment] || [];
-  const map = {};
-  (weightEntries || []).forEach(e => { map[e.rabbit] = e.weightKg; });
-  return rabbits.map(r => `R${r}: ${map[r] || 0}kg`).join(', ');
-}
-function formatLitterEntriesFull(litterEntries){
-  if(!litterEntries || !litterEntries.length) return '—';
-  return litterEntries.map(e => `R${e.rabbit}: ${e.litters} lits, ${e.kits} kits`).join('; ');
-}
-function formatDeathEntriesFull(deathEntries){
-  if(!deathEntries || !deathEntries.length) return '—';
-  return deathEntries.map(e => `${e.category} R${e.rabbit}: ${e.count}`).join('; ');
+function formatWeightForRabbits(weightEntries, rabbitList) {
+  if (!weightEntries || weightEntries.length === 0) return '—';
+  const filtered = weightEntries.filter(e => rabbitList.includes(e.rabbit));
+  if (filtered.length === 0) return '—';
+  return filtered.map(e => `R${e.rabbit}: ${e.weightKg}kg`).join(', ');
 }
 
 // ----- Group logs by (date, groupId, workerName) using ISO date -----
@@ -278,6 +270,11 @@ function groupLogsByWorker(logs){
 
 function combineWorkerLogs(group){
   const entries = group.entries;
+  // Since we now have all rabbits in each log, we can just take the first log's arrays
+  // (they should be identical across logs, but if multiple logs, we can merge)
+  // For simplicity, we'll use the first log's feedEntries and weightEntries (which contain all rabbits)
+  // and sum water and other totals.
+  const first = entries[0];
   const combined = {
     date: group.date,
     groupId: group.groupId,
@@ -298,15 +295,14 @@ function combineWorkerLogs(group){
     matingDate: entries.find(e => e.matingDate)?.matingDate || null,
     edd: entries.find(e => e.edd)?.edd || null,
     deliveryDate: entries.find(e => e.deliveryDate)?.deliveryDate || null,
-    treatments: entries.map(e => ({
-      feedTreatment: e.feedTreatment,
-      weightTreatment: e.weightTreatment,
-      feedEntries: e.feedEntries || [],
-      weightEntries: e.weightEntries || [],
-      waterLitres: e.waterLitres || 0,
-      litterEntries: e.litterEntries || [],
-      deathEntries: e.deathEntries || []
-    }))
+    // Use the first log's feedEntries and weightEntries (they contain all 20 rabbits)
+    feedEntries: first.feedEntries || [],
+    weightEntries: first.weightEntries || [],
+    // Total water (sum across all logs)
+    totalWater: entries.reduce((s, e) => s + (parseFloat(e.waterLitres) || 0), 0),
+    // Litter/death entries: combine from all logs
+    litterEntries: entries.flatMap(e => e.litterEntries || []),
+    deathEntries: entries.flatMap(e => e.deathEntries || [])
   };
   return combined;
 }
@@ -359,6 +355,7 @@ function updateOverview(){
 
 function filterGroup(id){ activeGroupFilter=id; updateOverview(); }
 
+// ----- RENDER GROUP VIEW (now shows all treatments) -----
 function renderGroupView(groups, combinedLogs){
   const target=activeGroupFilter==='all'?groups:groups.filter(g=>g.id===activeGroupFilter);
   if(!target.length){ document.getElementById('groupView').innerHTML='<div class="empty-state">No groups.</div>'; return; }
@@ -371,7 +368,7 @@ function renderGroupView(groups, combinedLogs){
         html+=`<div class="data-row">
           <div class="data-row-header">
             <span>🐇 ${l.workerName}</span>
-            <span>💧 ${l.treatments.reduce((s,t)=>s+t.waterLitres,0)}L</span>
+            <span>💧 ${l.totalWater}L total water</span>
           </div>
           <div class="data-row-detail">
             Males:${l.rMale}, Females:${l.rFemale}, Weaners:${l.rWeaners}, Kits:${l.rKits} |
@@ -382,26 +379,34 @@ function renderGroupView(groups, combinedLogs){
             ${l.deliveryDate?` | Delivered:${l.deliveryDate}`:''}
           </div>`;
 
-        // Show each treatment block
-        l.treatments.forEach((t, idx) => {
-          const feedT = treatmentLabel(t.feedTreatment);
-          const weightT = treatmentLabel(t.weightTreatment);
+        // Show each treatment block (Control, T1, T2, T3, T4)
+        for (const [treatId, rabbits] of Object.entries(TREATMENT_RABBITS)) {
+          const feedStr = formatFeedForRabbits(l.feedEntries, rabbits);
+          const weightStr = formatWeightForRabbits(l.weightEntries, rabbits);
+          // Only show block if there is any feed or weight data (or all zeros? we'll show if any)
+          const hasFeed = feedStr !== '—' && feedStr.split(',').some(s => parseFloat(s.split(':')[1]) > 0);
+          const hasWeight = weightStr !== '—' && weightStr.split(',').some(s => parseFloat(s.split(':')[1]) > 0);
+          if (!hasFeed && !hasWeight) continue; // skip empty treatments
+
+          const treatLabel = treatmentLabel(treatId);
           html+=`<div class="treatment-block">
-            <div class="treat-label">${feedT} / ${weightT} — Water: ${t.waterLitres}L</div>
+            <div class="treat-label">${treatLabel}</div>
             <div style="font-size:0.75rem;color:var(--slate);margin-top:2px">
-              <strong>🌾 Feed:</strong> ${formatFeedEntriesFull(t.feedEntries, t.feedTreatment)}<br>
-              <strong>⚖️ Weight:</strong> ${formatWeightEntriesFull(t.weightEntries, t.weightTreatment)}
+              <strong>🌾 Feed:</strong> ${feedStr}<br>
+              <strong>⚖️ Weight:</strong> ${weightStr}
             </div>
           </div>`;
-        });
+        }
 
-        // Combined litter/deaths across all treatments
-        const allLitter = l.treatments.flatMap(t => t.litterEntries || []);
-        const allDeath = l.treatments.flatMap(t => t.deathEntries || []);
+        // Litter/deaths combined
+        const allLitter = l.litterEntries || [];
+        const allDeath = l.deathEntries || [];
         if(allLitter.length || allDeath.length){
+          const litterStr = allLitter.map(e => `R${e.rabbit}: ${e.litters} lits, ${e.kits} kits`).join('; ');
+          const deathStr = allDeath.map(e => `${e.category} R${e.rabbit}: ${e.count}`).join('; ');
           html+=`<div class="entry-detail-block" style="margin-top:4px">
-            <strong>🐣 Litters/Kits:</strong> ${formatLitterEntriesFull(allLitter)}<br>
-            <strong>💀 Deaths:</strong> ${formatDeathEntriesFull(allDeath)}
+            <strong>🐣 Litters/Kits:</strong> ${litterStr || '—'}<br>
+            <strong>💀 Deaths:</strong> ${deathStr || '—'}
           </div>`;
         }
 
@@ -435,17 +440,23 @@ function renderRecentActivity(){
       let desc=`${worker}`;
       let details=`Males: ${l.rMale}, Females: ${l.rFemale}, Weaners: ${l.rWeaners}, Kits: ${l.rKits}`;
       details+=` | Bought: M:${l.boughtAdultMale}, F:${l.boughtAdultFemale}, W:${l.boughtWeaners}, K:${l.boughtKits} | Sold: ${l.rabbitsSold}`;
-      details+=` | Total Water: ${l.treatments.reduce((s,t)=>s+t.waterLitres,0)}L`;
-      l.treatments.forEach(t => {
-        const feedT = treatmentLabel(t.feedTreatment);
-        details+=` | ${feedT} Feed: ${formatFeedEntriesFull(t.feedEntries, t.feedTreatment)}`;
-        details+=` | ${feedT} Weight: ${formatWeightEntriesFull(t.weightEntries, t.weightTreatment)}`;
-        details+=` | ${feedT} Water: ${t.waterLitres}L`;
-      });
-      const allLitter = l.treatments.flatMap(t => t.litterEntries || []);
-      const allDeath = l.treatments.flatMap(t => t.deathEntries || []);
-      if(allLitter.length) details+=` | Litters/Kits: ${formatLitterEntriesFull(allLitter)}`;
-      if(allDeath.length) details+=` | Deaths: ${formatDeathEntriesFull(allDeath)}`;
+      details+=` | Total Water: ${l.totalWater}L`;
+      // Show each treatment
+      for (const [treatId, rabbits] of Object.entries(TREATMENT_RABBITS)) {
+        const feedStr = formatFeedForRabbits(l.feedEntries, rabbits);
+        const weightStr = formatWeightForRabbits(l.weightEntries, rabbits);
+        const hasFeed = feedStr !== '—' && feedStr.split(',').some(s => parseFloat(s.split(':')[1]) > 0);
+        const hasWeight = weightStr !== '—' && weightStr.split(',').some(s => parseFloat(s.split(':')[1]) > 0);
+        if (hasFeed || hasWeight) {
+          const treatLabel = treatmentLabel(treatId);
+          details+=` | ${treatLabel} Feed: ${feedStr}`;
+          details+=` | ${treatLabel} Weight: ${weightStr}`;
+        }
+      }
+      const allLitter = l.litterEntries || [];
+      const allDeath = l.deathEntries || [];
+      if(allLitter.length) details+=` | Litters/Kits: ${allLitter.map(e => `R${e.rabbit}: ${e.litters} lits, ${e.kits} kits`).join('; ')}`;
+      if(allDeath.length) details+=` | Deaths: ${allDeath.map(e => `${e.category} R${e.rabbit}: ${e.count}`).join('; ')}`;
       return `<div class="timeline-item"><div class="t-dot ${l.deaths>0?'danger':''}"></div><div class="t-body"><div class="t-title">🐇 ${desc}</div><div class="t-desc">${details}</div><div style="font-size:0.7rem;color:var(--slate);margin-top:2px">${grpName}</div></div><div class="t-time"><div>${d}</div><div>${t}</div></div></div>`;
     }).join('') || '<div class="empty-state">No recent rabbit farm activity.</div>';
     document.getElementById('recentLogs').innerHTML=recentHtml;
@@ -489,10 +500,16 @@ async function updateAnalytics(){
   const weightByTreatment = {};
   groupLogs.forEach(l=>{
     if(l.weightEntries && l.weightEntries.length){
-      const treat = l.weightTreatment || 'unknown';
-      if(!weightByTreatment[treat]) weightByTreatment[treat] = [];
-      l.weightEntries.forEach(w=>{
-        weightByTreatment[treat].push(w.weightKg);
+      // For each weight entry, determine its treatment and aggregate
+      l.weightEntries.forEach(w => {
+        let treat = null;
+        for (const [tId, rabbits] of Object.entries(TREATMENT_RABBITS)) {
+          if (rabbits.includes(w.rabbit)) { treat = tId; break; }
+        }
+        if (treat) {
+          if (!weightByTreatment[treat]) weightByTreatment[treat] = [];
+          weightByTreatment[treat].push(w.weightKg);
+        }
       });
     } else {
       const treatments = ['control','t1','t2','t3','t4'];
@@ -641,18 +658,23 @@ async function makeReport(type, specificDate=null){
     entries.forEach(l=>{
       report+=`  Worker: ${l.workerName}\n`;
       report+=`    Males:${l.rMale}, Females:${l.rFemale}, Weaners:${l.rWeaners}, Kits:${l.rKits}\n`;
-      l.treatments.forEach(t=>{
-        const feedT = treatmentLabel(t.feedTreatment);
-        const weightT = treatmentLabel(t.weightTreatment);
-        report+=`    ${feedT} / ${weightT}:\n`;
-        report+=`      Water: ${t.waterLitres}L\n`;
-        report+=`      Feed: ${formatFeedEntriesFull(t.feedEntries, t.feedTreatment)}\n`;
-        report+=`      Weight: ${formatWeightEntriesFull(t.weightEntries, t.weightTreatment)}\n`;
-      });
-      const allLitter = l.treatments.flatMap(t => t.litterEntries || []);
-      const allDeath = l.treatments.flatMap(t => t.deathEntries || []);
-      if(allLitter.length) report+=`    Litters/Kits: ${formatLitterEntriesFull(allLitter)}\n`;
-      if(allDeath.length) report+=`    Deaths: ${formatDeathEntriesFull(allDeath)}\n`;
+      // For each treatment, show feed and weight
+      for (const [treatId, rabbits] of Object.entries(TREATMENT_RABBITS)) {
+        const feedStr = formatFeedForRabbits(l.feedEntries, rabbits);
+        const weightStr = formatWeightForRabbits(l.weightEntries, rabbits);
+        const hasFeed = feedStr !== '—' && feedStr.split(',').some(s => parseFloat(s.split(':')[1]) > 0);
+        const hasWeight = weightStr !== '—' && weightStr.split(',').some(s => parseFloat(s.split(':')[1]) > 0);
+        if (hasFeed || hasWeight) {
+          const treatLabel = treatmentLabel(treatId);
+          report+=`    ${treatLabel}:\n`;
+          if (hasFeed) report+=`      Feed: ${feedStr}\n`;
+          if (hasWeight) report+=`      Weight: ${weightStr}\n`;
+        }
+      }
+      const allLitter = l.litterEntries || [];
+      const allDeath = l.deathEntries || [];
+      if(allLitter.length) report+=`    Litters/Kits: ${allLitter.map(e => `R${e.rabbit}: ${e.litters} lits, ${e.kits} kits`).join('; ')}\n`;
+      if(allDeath.length) report+=`    Deaths: ${allDeath.map(e => `${e.category} R${e.rabbit}: ${e.count}`).join('; ')}\n`;
       if(l.matingDate) report+=`    Mating: ${l.matingDate}\n`;
       report+='\n';
     });
