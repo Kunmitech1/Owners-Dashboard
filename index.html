@@ -515,6 +515,7 @@ function stat(cls,num,label,wide){
 }
 function totalItem(num,label){ return `<div class="total-item"><div class="total-num">${num}</div><div class="total-label">${label}</div></div>`; }
 
+// ----- FIXED ACTIVITY TAB -----
 function renderRecentActivity(){
   Promise.all([getLogs(),getGroups()]).then(([logs,groups])=>{
     const grouped = groupLogsByWorker(logs.filter(l => l.farm === 'rabbit'));
@@ -528,24 +529,59 @@ function renderRecentActivity(){
       let details=`Males: ${l.rMale}, Females: ${l.rFemale}, Weaners: ${l.rWeaners}, Kits: ${l.rKits}`;
       details+=` | Bought: M:${l.boughtAdultMale}, F:${l.boughtAdultFemale}, W:${l.boughtWeaners}, K:${l.boughtKits} | Sold: ${l.rabbitsSold}`;
       
-      if (l.treatmentData) {
+      // --- FIX: Use treatmentData instead of old waterLitres ---
+      if (l.treatmentData && l.treatmentData.length > 0) {
+        // Show total water
+        const totalWater = l.treatmentData.reduce((sum, td) => sum + (td.waterLitres || 0), 0);
+        details += ` | 💧 Total Water: ${totalWater}L`;
+        
+        // Show each treatment's feed and weight
         l.treatmentData.forEach(td => {
-          const treatLabel = TREATMENT_LABELS[td.treatment] || td.treatment;
+          const treatLabel = TREATMENT_LABELS[td.treatment] || td.treatment || 'Unknown';
           const rabbits = TREATMENT_RABBITS[td.treatment] || [];
-          const feedStr = formatFeedForRabbits(td.feedEntries, rabbits);
-          const weightStr = formatWeightForRabbits(td.weightEntries, rabbits);
-          if (feedStr || weightStr || td.waterLitres > 0) {
-            details+=` | ${treatLabel} Water: ${td.waterLitres}L`;
-            if (feedStr) details+=` | ${treatLabel} Feed: ${feedStr}`;
-            if (weightStr) details+=` | ${treatLabel} Weight: ${weightStr}`;
+          
+          // Get feed for this treatment
+          let feedStr = '';
+          if (td.feedEntries && td.feedEntries.length > 0) {
+            const filtered = td.feedEntries.filter(e => rabbits.includes(parseInt(e.rabbit)));
+            if (filtered.length > 0) {
+              feedStr = filtered.map(e => `R${e.rabbit}: ${e.feedGrams}g`).join(', ');
+            }
+          }
+          
+          // Get weight for this treatment
+          let weightStr = '';
+          if (td.weightEntries && td.weightEntries.length > 0) {
+            const filtered = td.weightEntries.filter(e => rabbits.includes(parseInt(e.rabbit)));
+            if (filtered.length > 0) {
+              weightStr = filtered.map(e => `R${e.rabbit}: ${e.weightKg}kg`).join(', ');
+            }
+          }
+          
+          // Only show if there's data
+          if (td.waterLitres > 0 || feedStr || weightStr) {
+            details += ` | ${treatLabel}: Water: ${td.waterLitres}L`;
+            if (feedStr) details += `, Feed: ${feedStr}`;
+            if (weightStr) details += `, Weight: ${weightStr}`;
           }
         });
+      } else {
+        // Fallback for old logs without treatmentData
+        const oldWater = l.waterLitres || 0;
+        if (oldWater > 0) details += ` | 💧 Water: ${oldWater}L`;
+        if (l.feedEntries && l.feedEntries.length > 0) {
+          details += ` | Feed: ${l.feedEntries.map(e => `R${e.rabbit}: ${e.feedGrams}g`).join(', ')}`;
+        }
+        if (l.weightEntries && l.weightEntries.length > 0) {
+          details += ` | Weight: ${l.weightEntries.map(e => `R${e.rabbit}: ${e.weightKg}kg`).join(', ')}`;
+        }
       }
       
+      // Litters & Deaths
       const allLitter = l.litterEntries || [];
       const allDeath = l.deathEntries || [];
-      if(allLitter.length) details+=` | Litters/Kits: ${allLitter.map(e => `R${e.rabbit}: ${e.litters} lits, ${e.kits} kits`).join('; ')}`;
-      if(allDeath.length) details+=` | Deaths: ${allDeath.map(e => `${e.category} R${e.rabbit}: ${e.count}`).join('; ')}`;
+      if(allLitter.length) details+=` | 🐣 Litters/Kits: ${allLitter.map(e => `R${e.rabbit}: ${e.litters} lits, ${e.kits} kits`).join('; ')}`;
+      if(allDeath.length) details+=` | 💀 Deaths: ${allDeath.map(e => `${e.category} R${e.rabbit}: ${e.count}`).join('; ')}`;
       
       return `<div class="timeline-item"><div class="t-dot ${l.deaths>0?'danger':''}"></div><div class="t-body"><div class="t-title">🐇 ${desc}</div><div class="t-desc">${details}</div><div style="font-size:0.7rem;color:var(--slate);margin-top:2px">${grpName}</div></div><div class="t-time"><div>${d}</div><div>${t}</div></div></div>`;
     }).join('') || '<div class="empty-state">No recent rabbit farm activity.</div>';
@@ -553,7 +589,7 @@ function renderRecentActivity(){
   });
 }
 
-// Analytics functions (unchanged, but using treatmentData where available)
+// Analytics functions
 function setRange(range){ activeRange=range; document.querySelectorAll('.range-tab').forEach(b=>b.classList.remove('active')); document.querySelector(`.range-tab[onclick="setRange('${range}')"]`).classList.add('active'); updateAnalytics(); }
 function setWaterRange(r){ waterRange=r; updateWaterChart(); }
 
