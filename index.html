@@ -9,92 +9,108 @@
 <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-database-compat.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-/* (your existing styles – keep unchanged) */
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--primary:#6366f1;--primary-light:#818cf8;--primary-dark:#4338ca;--success:#10b981;--warning:#f59e0b;--danger:#ef4444;--rose:#f43f5e;--bg:#f8fafc;--card:#ffffff;--border:#e2e8f0;--text:#0f172a;--slate:#64748b;--shadow:0 4px 12px rgba(0,0,0,0.06)}
-body{font-family:'Inter',sans-serif;background:var(--bg);min-height:100vh;color:var(--text)}
+body{font-family:'Inter',sans-serif;background:var(--bg);min-height:100vh;color:var(--text);font-size:16px;line-height:1.6}
 .app{max-width:560px;margin:0 auto;background:var(--bg);min-height:100vh;padding-bottom:90px}
 .header{background:linear-gradient(135deg,#1e1b4b,#4338ca);padding:28px 24px;color:#fff}
 .header-top{display:flex;align-items:center;gap:12px;margin-bottom:4px}
 .header-icon{width:48px;height:48px;background:rgba(255,255,255,0.2);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.5rem}
-.header h1{font-size:1.3rem;font-weight:800;letter-spacing:-0.02em}
-.header-date{font-size:0.8rem;opacity:0.8;margin-left:60px}
-.nav{display:flex;gap:4px;padding:14px 16px;background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
-.nav button{flex:1;padding:12px 4px;border:none;border-radius:12px;background:transparent;color:var(--slate);font-size:0.7rem;font-weight:700;cursor:pointer;transition:all 0.2s}
+.header h1{font-size:1.5rem;font-weight:800;letter-spacing:-0.02em}
+.header-date{font-size:0.9rem;opacity:0.8;margin-left:60px}
+.nav{display:flex;gap:6px;padding:14px 16px;background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
+.nav button{flex:1;padding:12px 6px;border:none;border-radius:12px;background:transparent;color:var(--slate);font-size:0.75rem;font-weight:700;cursor:pointer;transition:all 0.2s}
 .nav button.active{background:var(--primary);color:#fff;box-shadow:0 4px 12px rgba(99,102,241,0.3)}
-.card{background:var(--card);border-radius:20px;padding:22px;margin:16px 18px;box-shadow:var(--shadow)}
-.section-label{font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--slate);font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.card{background:var(--card);border-radius:20px;padding:24px;margin:16px 18px;box-shadow:var(--shadow)}
+.section-label{font-size:0.85rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--slate);font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px}
 .section-label::after{content:'';flex:1;height:1px;background:var(--border)}
 .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.stat-box{border-radius:16px;padding:18px 14px;text-align:center;border:1.5px solid var(--border);transition:transform 0.2s}
+.stat-box{border-radius:16px;padding:20px 16px;text-align:center;border:2px solid var(--border);transition:transform 0.2s}
 .stat-box:hover{transform:translateY(-2px)}
 .stat-box.green{background:#ecfdf5;border-color:#a7f3d0}
 .stat-box.amber{background:#fffbeb;border-color:#fcd34d}
 .stat-box.rose{background:#fff1f2;border-color:#fecdd3}
 .stat-box.red{background:#fef2f2;border-color:#fecaca}
 .stat-box.blue{background:#eff6ff;border-color:#bfdbfe}
-.stat-num{font-size:2rem;font-weight:900;line-height:1}
+.stat-num{font-size:2.4rem;font-weight:900;line-height:1.2}
 .stat-box.green .stat-num{color:var(--success)}
 .stat-box.amber .stat-num{color:var(--warning)}
 .stat-box.rose .stat-num{color:var(--rose)}
 .stat-box.red .stat-num{color:var(--danger)}
 .stat-box.blue .stat-num{color:var(--primary)}
-.stat-label{font-size:0.7rem;color:var(--slate);margin-top:8px;font-weight:600;line-height:1.3}
-.alert{padding:14px 16px;border-radius:12px;margin:12px 18px;font-size:0.85rem;font-weight:600;display:flex;align-items:flex-start;gap:10px;box-shadow:var(--shadow)}
-.alert-icon{font-size:1.1rem;flex-shrink:0;margin-top:2px}
+.stat-label{font-size:0.85rem;color:var(--slate);margin-top:8px;font-weight:600}
+.alert{padding:16px 18px;border-radius:12px;margin:12px 18px;font-size:0.95rem;font-weight:600;display:flex;align-items:flex-start;gap:12px}
+.alert-icon{font-size:1.2rem;flex-shrink:0;margin-top:2px}
 .alert.danger{background:#fef2f2;color:var(--danger);border-left:5px solid var(--danger)}
 .alert.warning{background:#fffbeb;color:#92400e;border-left:5px solid var(--warning)}
 .alert.success{background:#ecfdf5;color:#065f46;border-left:5px solid var(--success)}
-.group-tabs,.range-tabs{display:flex;gap:8px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
-.group-tab,.range-tab{padding:10px 18px;border-radius:24px;border:1.5px solid var(--border);background:#fff;font-size:0.78rem;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;color:var(--slate);transition:all 0.2s}
-.group-tab.active{background:var(--primary);color:#fff;border-color:var(--primary);box-shadow:0 4px 10px rgba(99,102,241,0.3)}
+.group-tabs,.range-tabs{display:flex;gap:10px;margin-bottom:16px;overflow-x:auto;padding-bottom:6px}
+.group-tab,.range-tab{padding:10px 20px;border-radius:24px;border:2px solid var(--border);background:#fff;font-size:0.85rem;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;color:var(--slate);transition:all 0.2s}
+.group-tab.active{background:var(--primary);color:#fff;border-color:var(--primary)}
 .range-tab.active{background:var(--success);color:#fff;border-color:var(--success)}
-.data-row{display:flex;flex-direction:column;padding:10px 0;border-bottom:1px solid var(--border);gap:4px}
-.data-row-header{display:flex;justify-content:space-between;font-weight:700;font-size:0.85rem}
-.data-row-detail{font-size:0.75rem;color:var(--slate);line-height:1.5}
-.worker-row{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--border)}
-.avatar-sm{width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.9rem;font-weight:800;flex-shrink:0}
-.worker-info{flex:1}
-.worker-name{font-weight:700;font-size:0.9rem}
-.worker-meta{font-size:0.73rem;color:var(--slate);margin-top:2px}
-.remove-btn{background:#fee2e2;color:var(--danger);border:none;padding:8px 14px;border-radius:10px;font-size:0.74rem;font-weight:700;cursor:pointer;transition:opacity 0.2s}
-.remove-btn:hover{opacity:0.8}
-.form-group{margin-bottom:20px}
-.form-label{display:block;font-size:0.85rem;font-weight:700;margin-bottom:6px;color:var(--text)}
-.form-input,select.form-input{width:100%;padding:16px 16px;border:2px solid var(--border);border-radius:12px;font-size:1rem;font-family:inherit;background:#fff;transition:border-color 0.2s}
-.form-input:focus,select.form-input:focus{outline:none;border-color:var(--primary)}
-.add-row{display:flex;gap:10px;align-items:flex-end}
-.add-row .form-input{flex:1}
-.btn{width:100%;padding:16px;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:10px;transition:all 0.2s}
+.group-header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:#fff;border-radius:16px;padding:18px 20px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between}
+.group-header-name{font-size:1.3rem;font-weight:800}
+.group-header-sub{font-size:0.85rem;opacity:0.85;margin-top:4px}
+.totals-card{background:linear-gradient(135deg,var(--primary-dark),var(--primary));border-radius:20px;padding:24px;margin:16px 18px;color:#fff}
+.totals-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.total-item{text-align:center;background:rgba(255,255,255,0.12);border-radius:12px;padding:16px 8px}
+.total-num{font-size:1.8rem;font-weight:900;line-height:1.2}
+.total-label{font-size:0.75rem;opacity:0.85;margin-top:4px;font-weight:600}
+.worker-summary{background:#f8fafc;border-radius:16px;padding:18px 16px;margin-bottom:16px;border-left:4px solid var(--primary)}
+.worker-name-large{font-size:1.1rem;font-weight:800;color:var(--text);margin-bottom:4px}
+.worker-stats{font-size:0.85rem;color:var(--slate);display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px}
+.worker-stats span{background:#fff;padding:2px 12px;border-radius:12px;border:1px solid var(--border)}
+.treatment-card{background:#fff;border-radius:14px;padding:16px 18px;margin-bottom:14px;border:2px solid var(--border);transition:all 0.2s}
+.treatment-card:hover{border-color:var(--primary)}
+.treatment-card.control{border-left:5px solid #10b981}
+.treatment-card.t1{border-left:5px solid #3b82f6}
+.treatment-card.t2{border-left:5px solid #8b5cf6}
+.treatment-card.t3{border-left:5px solid #ec4899}
+.treatment-card.t4{border-left:5px solid #f59e0b}
+.treatment-title{font-size:1rem;font-weight:800;color:var(--text);display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.treatment-title .water-badge{font-weight:700;color:#2563eb;background:#eff6ff;padding:2px 14px;border-radius:16px;font-size:0.85rem}
+.rabbit-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.rabbit-item{background:#f8fafc;border-radius:10px;padding:8px 12px;font-size:0.85rem;display:flex;justify-content:space-between;align-items:center;border:1px solid var(--border)}
+.rabbit-id{font-weight:700;color:var(--primary-dark)}
+.rabbit-feed{color:var(--slate)}
+.rabbit-weight{color:var(--slate)}
+.rabbit-empty{color:#94a3b8;font-style:italic}
+.extra-data{background:#f8fafc;border-radius:12px;padding:14px 16px;margin-top:12px;font-size:0.85rem;display:flex;flex-wrap:wrap;gap:12px;border:1px dashed var(--border)}
+.extra-data span{background:#fff;padding:4px 14px;border-radius:12px;font-weight:600;border:1px solid var(--border)}
+.logged-by{font-size:0.8rem;color:var(--slate);margin-top:10px}
+.logged-by .tag{background:var(--primary);color:#fff;padding:2px 12px;border-radius:12px;font-size:0.75rem;display:inline-block;margin-right:6px}
+.empty-state{text-align:center;padding:40px 20px;color:var(--slate);font-size:0.95rem}
+.btn{width:100%;padding:16px;border:none;border-radius:14px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:10px;transition:all 0.2s}
 .btn:active{transform:scale(0.98)}
 .btn-primary{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;box-shadow:0 4px 14px rgba(99,102,241,0.4)}
 .btn-secondary{background:#fff;color:var(--text);border:2px solid var(--border)}
 .btn-sm{width:auto;padding:10px 20px;margin-top:0}
+.form-group{margin-bottom:20px}
+.form-label{display:block;font-size:0.85rem;font-weight:700;margin-bottom:6px;color:var(--text)}
+.form-input,select.form-input{width:100%;padding:16px 16px;border:2px solid var(--border);border-radius:12px;font-size:1rem;font-family:inherit;background:#fff;transition:border-color 0.2s}
+.form-input:focus,select.form-input:focus{outline:none;border-color:var(--primary)}
+.worker-row{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--border)}
+.avatar-sm{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.9rem;font-weight:800;flex-shrink:0}
+.worker-info{flex:1}
+.worker-name{font-weight:700;font-size:0.9rem}
+.worker-meta{font-size:0.73rem;color:var(--slate);margin-top:2px}
+.remove-btn{background:#fee2e2;color:var(--danger);border:none;padding:8px 14px;border-radius:10px;font-size:0.74rem;font-weight:700;cursor:pointer}
+.add-row{display:flex;gap:10px;align-items:flex-end}
+.add-row .form-input{flex:1}
 .report-box{background:#f8fafc;border:1px dashed var(--border);border-radius:12px;padding:18px;font-family:'Courier New',monospace;font-size:0.78rem;white-space:pre-wrap;max-height:340px;overflow-y:auto;line-height:1.7}
 .timeline-item{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--border);align-items:flex-start}
 .t-dot{width:12px;height:12px;border-radius:50%;background:var(--success);margin-top:6px;flex-shrink:0;box-shadow:0 0 6px rgba(16,185,129,0.5)}
-.t-dot.danger{background:var(--danger);box-shadow:0 0 6px rgba(239,68,68,0.5)}
+.t-dot.danger{background:var(--danger)}
 .t-body{flex:1}
 .t-title{font-weight:700;font-size:0.88rem;line-height:1.4}
 .t-desc{font-size:0.76rem;color:var(--slate);margin-top:4px;line-height:1.4}
 .t-time{font-size:0.7rem;color:var(--slate);white-space:nowrap;text-align:right;line-height:1.4}
 .bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:560px;background:#fff;border-top:1px solid var(--border);display:flex;padding:10px 8px 20px;z-index:200;box-shadow:0 -2px 10px rgba(0,0,0,0.06)}
-.bottom-nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;border:none;background:none;color:var(--slate);font-size:0.62rem;font-weight:600;cursor:pointer;padding:6px 0;border-radius:12px;transition:all 0.2s}
+.bottom-nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;border:none;background:none;color:var(--slate);font-size:0.65rem;font-weight:600;cursor:pointer;padding:6px 0;border-radius:12px;transition:all 0.2s}
 .bottom-nav button.active{color:var(--primary);background:rgba(99,102,241,0.08)}
 .nav-icon{font-size:1.4rem;line-height:1}
 .hidden{display:none !important}
-.empty-state{text-align:center;padding:40px 20px;color:var(--slate);font-size:0.9rem}
 .chart-container{margin:24px 0;position:relative;height:220px;width:100%}
-.group-header{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;border-radius:14px;padding:16px 18px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between}
-.totals-card{background:linear-gradient(135deg,var(--primary-dark),var(--primary));border-radius:20px;padding:24px;margin:16px 18px;color:#fff;box-shadow:0 8px 24px rgba(99,102,241,0.3)}
-.totals-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-.total-item{text-align:center;background:rgba(255,255,255,0.15);border-radius:12px;padding:14px 8px;backdrop-filter:blur(4px)}
-.total-num{font-size:1.5rem;font-weight:900;line-height:1}
-.total-label{font-size:0.68rem;opacity:0.8;margin-top:6px;font-weight:600;line-height:1.2}
-.entry-detail-block{background:#f8fafc;border-radius:10px;padding:10px;margin-top:6px;font-size:0.8rem;border-left:3px solid var(--primary)}
-.entry-detail-block strong{color:var(--text)}
-.treatment-block{margin-top:8px;padding:8px;background:#fff;border-radius:8px;border:1px solid var(--border)}
-.treatment-block .treat-label{font-weight:700;color:var(--primary);font-size:0.8rem}
 </style>
 </head>
 <body>
@@ -115,9 +131,13 @@ body{font-family:'Inter',sans-serif;background:var(--bg);min-height:100vh;color:
 <!-- OVERVIEW TAB -->
 <div id="tab-overview">
   <div id="dashAlerts"></div>
-  <div class="totals-card"><div class="totals-title">📊 All Groups Combined — Today</div><div class="totals-grid" id="combinedTotals"></div></div>
+  <div class="totals-card"><div class="totals-title" style="font-size:1.1rem;font-weight:800;margin-bottom:12px">📊 All Groups Combined — Today</div><div class="totals-grid" id="combinedTotals"></div></div>
   <div class="card"><div class="section-label">🐇 Rabbit Farm — Today</div><div class="stat-grid" id="rabbitStats"></div></div>
-  <div class="card"><div class="section-label">👥 By Group</div><div class="group-tabs" id="groupFilterTabs"></div><div id="groupView"></div></div>
+  <div class="card">
+    <div class="section-label">👥 By Group</div>
+    <div class="group-tabs" id="groupFilterTabs"></div>
+    <div id="groupView"></div>
+  </div>
 </div>
 
 <!-- GROUPS TAB -->
@@ -220,12 +240,25 @@ const TREATMENT_RABBITS = {
   t4: [17,18,19,20]
 };
 
+const TREATMENT_LABELS = {
+  control: 'Control',
+  t1: 'Treatment 1',
+  t2: 'Treatment 2',
+  t3: 'Treatment 3',
+  t4: 'Treatment 4'
+};
+
+const TREATMENT_COLORS = {
+  control: 'control',
+  t1: 't1',
+  t2: 't2',
+  t3: 't3',
+  t4: 't4'
+};
+
 const RANGE_DAYS = { '1W':7, '2W':14, '1M':30, '3M':90, '6M':180, '1Y':365 };
 function fmt(n){ return Number(n).toLocaleString(); }
 function sum(arr,key){ return arr.reduce((s,l)=>s+(parseFloat(l[key])||0),0); }
-function treatmentLabel(t){ return t ? t.charAt(0).toUpperCase()+t.slice(1) : '—'; }
-
-// Use ISO date for consistent grouping
 function todayISO(){ return new Date().toISOString().split('T')[0]; }
 
 var activeGroupFilter='all';
@@ -235,21 +268,20 @@ var waterRange='daily';
 var analyticsGroup='all';
 var lastReportType='daily';
 
-// Helper: format feed entries for a given list of rabbit numbers
-function formatFeedForRabbits(feedEntries, rabbitList) {
-  if (!feedEntries || feedEntries.length === 0) return '—';
-  const filtered = feedEntries.filter(e => rabbitList.includes(e.rabbit));
-  if (filtered.length === 0) return '—';
-  return filtered.map(e => `R${e.rabbit}: ${e.feedGrams}g`).join(', ');
-}
-function formatWeightForRabbits(weightEntries, rabbitList) {
-  if (!weightEntries || weightEntries.length === 0) return '—';
-  const filtered = weightEntries.filter(e => rabbitList.includes(e.rabbit));
-  if (filtered.length === 0) return '—';
-  return filtered.map(e => `R${e.rabbit}: ${e.weightKg}kg`).join(', ');
+function getTreatmentData(log) {
+  if (log.treatmentData && log.treatmentData.length > 0) {
+    return log.treatmentData;
+  }
+  // Fallback for old logs
+  const feedEntries = log.feedEntries || [];
+  const weightEntries = log.weightEntries || [];
+  const water = log.waterLitres || 0;
+  if (feedEntries.length > 0 || weightEntries.length > 0 || water > 0) {
+    return [{ treatment: 'legacy', waterLitres: water, feedEntries: feedEntries, weightEntries: weightEntries }];
+  }
+  return [];
 }
 
-// ----- Group logs by (date, groupId, workerName) using ISO date -----
 function groupLogsByWorker(logs){
   const groups = {};
   logs.forEach(l => {
@@ -270,12 +302,32 @@ function groupLogsByWorker(logs){
 
 function combineWorkerLogs(group){
   const entries = group.entries;
-  // Since we now have all rabbits in each log, we can just take the first log's arrays
-  // (they should be identical across logs, but if multiple logs, we can merge)
-  // For simplicity, we'll use the first log's feedEntries and weightEntries (which contain all rabbits)
-  // and sum water and other totals.
   const first = entries[0];
-  const combined = {
+  
+  // Combine treatment data from all entries
+  const combinedTreatments = {};
+  entries.forEach(log => {
+    const td = getTreatmentData(log);
+    td.forEach(t => {
+      const key = t.treatment;
+      if (!combinedTreatments[key]) {
+        combinedTreatments[key] = { waterLitres: 0, feedEntries: [], weightEntries: [] };
+      }
+      combinedTreatments[key].waterLitres += parseFloat(t.waterLitres) || 0;
+      if (t.feedEntries) combinedTreatments[key].feedEntries = combinedTreatments[key].feedEntries.concat(t.feedEntries);
+      if (t.weightEntries) combinedTreatments[key].weightEntries = combinedTreatments[key].weightEntries.concat(t.weightEntries);
+    });
+  });
+  
+  // Convert to array
+  const treatmentData = Object.entries(combinedTreatments).map(([treatment, data]) => ({
+    treatment: treatment,
+    waterLitres: data.waterLitres,
+    feedEntries: data.feedEntries,
+    weightEntries: data.weightEntries
+  }));
+
+  return {
     date: group.date,
     groupId: group.groupId,
     groupName: group.groupName,
@@ -295,19 +347,25 @@ function combineWorkerLogs(group){
     matingDate: entries.find(e => e.matingDate)?.matingDate || null,
     edd: entries.find(e => e.edd)?.edd || null,
     deliveryDate: entries.find(e => e.deliveryDate)?.deliveryDate || null,
-    // Use the first log's feedEntries and weightEntries (they contain all 20 rabbits)
-    feedEntries: first.feedEntries || [],
-    weightEntries: first.weightEntries || [],
-    // Total water (sum across all logs)
-    totalWater: entries.reduce((s, e) => s + (parseFloat(e.waterLitres) || 0), 0),
-    // Litter/death entries: combine from all logs
+    treatmentData: treatmentData,
     litterEntries: entries.flatMap(e => e.litterEntries || []),
     deathEntries: entries.flatMap(e => e.deathEntries || [])
   };
-  return combined;
 }
 
-// ----- Overview (enhanced) -----
+function formatFeedForRabbits(feedEntries, rabbitList) {
+  if (!feedEntries || feedEntries.length === 0) return null;
+  const filtered = feedEntries.filter(e => rabbitList.includes(parseInt(e.rabbit)));
+  if (filtered.length === 0) return null;
+  return filtered.map(e => `R${e.rabbit}: ${e.feedGrams}g`).join(', ');
+}
+function formatWeightForRabbits(weightEntries, rabbitList) {
+  if (!weightEntries || weightEntries.length === 0) return null;
+  const filtered = weightEntries.filter(e => rabbitList.includes(parseInt(e.rabbit)));
+  if (filtered.length === 0) return null;
+  return filtered.map(e => `R${e.rabbit}: ${e.weightKg}kg`).join(', ');
+}
+
 function updateOverview(){
   Promise.all([getLogs(),getGroups(),getWorkers()]).then(([logs,groups,workers])=>{
     const today = todayISO();
@@ -355,66 +413,96 @@ function updateOverview(){
 
 function filterGroup(id){ activeGroupFilter=id; updateOverview(); }
 
-// ----- RENDER GROUP VIEW (now shows all treatments) -----
 function renderGroupView(groups, combinedLogs){
   const target=activeGroupFilter==='all'?groups:groups.filter(g=>g.id===activeGroupFilter);
-  if(!target.length){ document.getElementById('groupView').innerHTML='<div class="empty-state">No groups.</div>'; return; }
+  if(!target.length){ document.getElementById('groupView').innerHTML='<div class="empty-state">No groups selected.</div>'; return; }
   let html='';
   target.forEach(g=>{
     const gLogs=combinedLogs.filter(l=>l.groupId===g.id);
-    html+=`<div style="margin-bottom:24px"><div class="group-header"><div><div class="group-header-name">${g.name}</div><div class="group-header-sub">${gLogs.length} workers logged today</div></div><div class="group-total-badge">${gLogs.length} entries</div></div>`;
+    html+=`<div style="margin-bottom:30px">`;
+    html+=`<div class="group-header">
+      <div><div class="group-header-name">${g.name}</div>
+      <div class="group-header-sub">${gLogs.length} workers logged today</div></div>
+      <div style="background:rgba(255,255,255,0.2);padding:6px 16px;border-radius:20px;font-weight:700">${gLogs.length} logs</div>
+    </div>`;
+    
     if(gLogs.length){
-      gLogs.forEach(l=>{
-        html+=`<div class="data-row">
-          <div class="data-row-header">
-            <span>🐇 ${l.workerName}</span>
-            <span>💧 ${l.totalWater}L total water</span>
-          </div>
-          <div class="data-row-detail">
-            Males:${l.rMale}, Females:${l.rFemale}, Weaners:${l.rWeaners}, Kits:${l.rKits} |
-            Bought: M:${l.boughtAdultMale}, F:${l.boughtAdultFemale}, W:${l.boughtWeaners}, K:${l.boughtKits} |
-            Sold:${l.rabbitsSold} | New Kits:${l.newKits} | Litters:${l.litters}
-            ${l.matingDate?` | Mating:${l.matingDate}`:''}
-            ${l.edd?` | EDD:${l.edd}`:''}
-            ${l.deliveryDate?` | Delivered:${l.deliveryDate}`:''}
-          </div>`;
-
-        // Show each treatment block (Control, T1, T2, T3, T4)
-        for (const [treatId, rabbits] of Object.entries(TREATMENT_RABBITS)) {
-          const feedStr = formatFeedForRabbits(l.feedEntries, rabbits);
-          const weightStr = formatWeightForRabbits(l.weightEntries, rabbits);
-          // Only show block if there is any feed or weight data (or all zeros? we'll show if any)
-          const hasFeed = feedStr !== '—' && feedStr.split(',').some(s => parseFloat(s.split(':')[1]) > 0);
-          const hasWeight = weightStr !== '—' && weightStr.split(',').some(s => parseFloat(s.split(':')[1]) > 0);
-          if (!hasFeed && !hasWeight) continue; // skip empty treatments
-
-          const treatLabel = treatmentLabel(treatId);
-          html+=`<div class="treatment-block">
-            <div class="treat-label">${treatLabel}</div>
-            <div style="font-size:0.75rem;color:var(--slate);margin-top:2px">
-              <strong>🌾 Feed:</strong> ${feedStr}<br>
-              <strong>⚖️ Weight:</strong> ${weightStr}
-            </div>
-          </div>`;
+      gLogs.forEach(l => {
+        html+=`<div class="worker-summary">`;
+        html+=`<div class="worker-name-large">👤 ${l.workerName}</div>`;
+        html+=`<div class="worker-stats">
+          <span>🐇 Males: ${l.rMale}</span>
+          <span>🐇 Females: ${l.rFemale}</span>
+          <span>🐇 Weaners: ${l.rWeaners}</span>
+          <span>🐇 Kits: ${l.rKits}</span>
+          ${l.rabbitsSold>0?`<span>💰 Sold: ${l.rabbitsSold}</span>`:''}
+          ${l.newKits>0?`<span>🐣 New Kits: ${l.newKits}</span>`:''}
+          ${l.litters>0?`<span>📦 Litters: ${l.litters}</span>`:''}
+          ${l.deaths>0?`<span>💀 Deaths: ${l.deaths}</span>`:''}
+        </div>`;
+        html+=`<div style="font-size:0.8rem;color:var(--slate);margin-bottom:8px">📅 ${new Date(l.date).toLocaleString()}</div>`;
+        
+        // Show each treatment
+        if (l.treatmentData && l.treatmentData.length > 0) {
+          l.treatmentData.forEach(td => {
+            const treatId = td.treatment;
+            const treatLabel = TREATMENT_LABELS[treatId] || treatId;
+            const colorClass = TREATMENT_COLORS[treatId] || '';
+            const water = td.waterLitres || 0;
+            
+            // Check if there's any data to show
+            const hasFeed = td.feedEntries && td.feedEntries.some(e => e.feedGrams > 0);
+            const hasWeight = td.weightEntries && td.weightEntries.some(e => e.weightKg > 0);
+            if (!hasFeed && !hasWeight && water === 0) return;
+            
+            html+=`<div class="treatment-card ${colorClass}">`;
+            html+=`<div class="treatment-title">
+              <span>📌 ${treatLabel}</span>
+              <span class="water-badge">💧 ${water}L</span>
+            </div>`;
+            
+            // Feed
+            if (hasFeed) {
+              const rabbits = TREATMENT_RABBITS[treatId] || [];
+              const feedStr = formatFeedForRabbits(td.feedEntries, rabbits);
+              if (feedStr) {
+                html+=`<div style="font-size:0.85rem;margin-bottom:4px"><strong>🌾 Feed:</strong> ${feedStr}</div>`;
+              }
+            }
+            
+            // Weight
+            if (hasWeight) {
+              const rabbits = TREATMENT_RABBITS[treatId] || [];
+              const weightStr = formatWeightForRabbits(td.weightEntries, rabbits);
+              if (weightStr) {
+                html+=`<div style="font-size:0.85rem"><strong>⚖️ Weight:</strong> ${weightStr}</div>`;
+              }
+            }
+            html+=`</div>`;
+          });
         }
-
-        // Litter/deaths combined
+        
+        // Litters and Deaths
         const allLitter = l.litterEntries || [];
         const allDeath = l.deathEntries || [];
-        if(allLitter.length || allDeath.length){
-          const litterStr = allLitter.map(e => `R${e.rabbit}: ${e.litters} lits, ${e.kits} kits`).join('; ');
-          const deathStr = allDeath.map(e => `${e.category} R${e.rabbit}: ${e.count}`).join('; ');
-          html+=`<div class="entry-detail-block" style="margin-top:4px">
-            <strong>🐣 Litters/Kits:</strong> ${litterStr || '—'}<br>
-            <strong>💀 Deaths:</strong> ${deathStr || '—'}
-          </div>`;
+        if (allLitter.length > 0 || allDeath.length > 0) {
+          html+=`<div class="extra-data">`;
+          if (allLitter.length > 0) {
+            const litterStr = allLitter.map(e => `R${e.rabbit}: ${e.litters} lits, ${e.kits} kits`).join('; ');
+            html+=`<span>🐣 Litters/Kits: ${litterStr}</span>`;
+          }
+          if (allDeath.length > 0) {
+            const deathStr = allDeath.map(e => `${e.category} R${e.rabbit}: ${e.count}`).join('; ');
+            html+=`<span>💀 Deaths: ${deathStr}</span>`;
+          }
+          if (l.matingDate) html+=`<span>❤️ Mating: ${l.matingDate}</span>`;
+          html+=`</div>`;
         }
-
-        html+=`<div class="data-row-detail" style="font-size:0.7rem;color:var(--slate)">${new Date(l.date).toLocaleString()}</div>
-        </div>`;
+        
+        html+=`</div>`;
       });
     } else {
-      html+=`<div style="font-size:0.8rem;color:var(--slate);padding:6px 0">No rabbit entries today.</div>`;
+      html+=`<div class="empty-state">No rabbit entries today.</div>`;
     }
     html+=`</div>`;
   });
@@ -422,12 +510,11 @@ function renderGroupView(groups, combinedLogs){
 }
 
 function stat(cls,num,label,wide){
-  if(wide) return `<div class="stat-box ${cls||''}" style="grid-column:span 2;text-align:left;display:flex;justify-content:space-between;align-items:center"><span style="font-size:0.84rem;font-weight:600;color:var(--slate)">${label}</span></div>`;
+  if(wide) return `<div class="stat-box ${cls||''}" style="grid-column:span 2;text-align:left;display:flex;justify-content:space-between;align-items:center"><span style="font-size:0.9rem;font-weight:600;color:var(--slate)">${label}</span><span style="font-weight:900;font-size:1.4rem">${num}</span></div>`;
   return `<div class="stat-box ${cls||''}"><div class="stat-num">${num}</div><div class="stat-label">${label}</div></div>`;
 }
 function totalItem(num,label){ return `<div class="total-item"><div class="total-num">${num}</div><div class="total-label">${label}</div></div>`; }
 
-// ----- Activity (enhanced) -----
 function renderRecentActivity(){
   Promise.all([getLogs(),getGroups()]).then(([logs,groups])=>{
     const grouped = groupLogsByWorker(logs.filter(l => l.farm === 'rabbit'));
@@ -440,30 +527,33 @@ function renderRecentActivity(){
       let desc=`${worker}`;
       let details=`Males: ${l.rMale}, Females: ${l.rFemale}, Weaners: ${l.rWeaners}, Kits: ${l.rKits}`;
       details+=` | Bought: M:${l.boughtAdultMale}, F:${l.boughtAdultFemale}, W:${l.boughtWeaners}, K:${l.boughtKits} | Sold: ${l.rabbitsSold}`;
-      details+=` | Total Water: ${l.totalWater}L`;
-      // Show each treatment
-      for (const [treatId, rabbits] of Object.entries(TREATMENT_RABBITS)) {
-        const feedStr = formatFeedForRabbits(l.feedEntries, rabbits);
-        const weightStr = formatWeightForRabbits(l.weightEntries, rabbits);
-        const hasFeed = feedStr !== '—' && feedStr.split(',').some(s => parseFloat(s.split(':')[1]) > 0);
-        const hasWeight = weightStr !== '—' && weightStr.split(',').some(s => parseFloat(s.split(':')[1]) > 0);
-        if (hasFeed || hasWeight) {
-          const treatLabel = treatmentLabel(treatId);
-          details+=` | ${treatLabel} Feed: ${feedStr}`;
-          details+=` | ${treatLabel} Weight: ${weightStr}`;
-        }
+      
+      if (l.treatmentData) {
+        l.treatmentData.forEach(td => {
+          const treatLabel = TREATMENT_LABELS[td.treatment] || td.treatment;
+          const rabbits = TREATMENT_RABBITS[td.treatment] || [];
+          const feedStr = formatFeedForRabbits(td.feedEntries, rabbits);
+          const weightStr = formatWeightForRabbits(td.weightEntries, rabbits);
+          if (feedStr || weightStr || td.waterLitres > 0) {
+            details+=` | ${treatLabel} Water: ${td.waterLitres}L`;
+            if (feedStr) details+=` | ${treatLabel} Feed: ${feedStr}`;
+            if (weightStr) details+=` | ${treatLabel} Weight: ${weightStr}`;
+          }
+        });
       }
+      
       const allLitter = l.litterEntries || [];
       const allDeath = l.deathEntries || [];
       if(allLitter.length) details+=` | Litters/Kits: ${allLitter.map(e => `R${e.rabbit}: ${e.litters} lits, ${e.kits} kits`).join('; ')}`;
       if(allDeath.length) details+=` | Deaths: ${allDeath.map(e => `${e.category} R${e.rabbit}: ${e.count}`).join('; ')}`;
+      
       return `<div class="timeline-item"><div class="t-dot ${l.deaths>0?'danger':''}"></div><div class="t-body"><div class="t-title">🐇 ${desc}</div><div class="t-desc">${details}</div><div style="font-size:0.7rem;color:var(--slate);margin-top:2px">${grpName}</div></div><div class="t-time"><div>${d}</div><div>${t}</div></div></div>`;
     }).join('') || '<div class="empty-state">No recent rabbit farm activity.</div>';
     document.getElementById('recentLogs').innerHTML=recentHtml;
   });
 }
 
-// ----- Analytics (unchanged) -----
+// Analytics functions (unchanged, but using treatmentData where available)
 function setRange(range){ activeRange=range; document.querySelectorAll('.range-tab').forEach(b=>b.classList.remove('active')); document.querySelector(`.range-tab[onclick="setRange('${range}')"]`).classList.add('active'); updateAnalytics(); }
 function setWaterRange(r){ waterRange=r; updateWaterChart(); }
 
@@ -499,29 +589,14 @@ async function updateAnalytics(){
 
   const weightByTreatment = {};
   groupLogs.forEach(l=>{
-    if(l.weightEntries && l.weightEntries.length){
-      // For each weight entry, determine its treatment and aggregate
-      l.weightEntries.forEach(w => {
-        let treat = null;
-        for (const [tId, rabbits] of Object.entries(TREATMENT_RABBITS)) {
-          if (rabbits.includes(w.rabbit)) { treat = tId; break; }
-        }
-        if (treat) {
-          if (!weightByTreatment[treat]) weightByTreatment[treat] = [];
-          weightByTreatment[treat].push(w.weightKg);
-        }
-      });
-    } else {
-      const treatments = ['control','t1','t2','t3','t4'];
-      treatments.forEach(t=>{
-        const key = t==='control' ? 'weightControl' : `weightTreatment${t.slice(1)}`;
-        const val = parseFloat(l[key]) || 0;
-        if(val>0){
-          if(!weightByTreatment[t]) weightByTreatment[t]=[];
-          weightByTreatment[t].push(val);
-        }
-      });
-    }
+    const td = getTreatmentData(l);
+    td.forEach(t => {
+      if (t.weightEntries && t.weightEntries.length > 0) {
+        const treat = t.treatment || 'legacy';
+        if (!weightByTreatment[treat]) weightByTreatment[treat] = [];
+        t.weightEntries.forEach(w => weightByTreatment[treat].push(w.weightKg));
+      }
+    });
   });
   const avgWeight = {};
   for(const [t, vals] of Object.entries(weightByTreatment)){
@@ -596,7 +671,8 @@ async function updateWaterChart(){
     else if(waterRange==='yearly') key=`${dt.getFullYear()}`;
     else key=dt.toDateString();
     if(!waterData[key]) waterData[key]=0;
-    waterData[key]+=parseFloat(l.waterLitres)||0;
+    const td = getTreatmentData(l);
+    td.forEach(t => { waterData[key] += parseFloat(t.waterLitres) || 0; });
   });
   const labels=Object.keys(waterData).slice(-20);
   const data=labels.map(k=>waterData[k]);
@@ -612,7 +688,6 @@ async function updateWaterChart(){
   });
 }
 
-// ----- Reports (enhanced) -----
 async function makeReport(type, specificDate=null){
   const logs=await getLogs();
   const groups=await getGroups();
@@ -658,18 +733,17 @@ async function makeReport(type, specificDate=null){
     entries.forEach(l=>{
       report+=`  Worker: ${l.workerName}\n`;
       report+=`    Males:${l.rMale}, Females:${l.rFemale}, Weaners:${l.rWeaners}, Kits:${l.rKits}\n`;
-      // For each treatment, show feed and weight
-      for (const [treatId, rabbits] of Object.entries(TREATMENT_RABBITS)) {
-        const feedStr = formatFeedForRabbits(l.feedEntries, rabbits);
-        const weightStr = formatWeightForRabbits(l.weightEntries, rabbits);
-        const hasFeed = feedStr !== '—' && feedStr.split(',').some(s => parseFloat(s.split(':')[1]) > 0);
-        const hasWeight = weightStr !== '—' && weightStr.split(',').some(s => parseFloat(s.split(':')[1]) > 0);
-        if (hasFeed || hasWeight) {
-          const treatLabel = treatmentLabel(treatId);
+      if (l.treatmentData) {
+        l.treatmentData.forEach(td => {
+          const treatLabel = TREATMENT_LABELS[td.treatment] || td.treatment;
+          const rabbits = TREATMENT_RABBITS[td.treatment] || [];
+          const feedStr = formatFeedForRabbits(td.feedEntries, rabbits);
+          const weightStr = formatWeightForRabbits(td.weightEntries, rabbits);
           report+=`    ${treatLabel}:\n`;
-          if (hasFeed) report+=`      Feed: ${feedStr}\n`;
-          if (hasWeight) report+=`      Weight: ${weightStr}\n`;
-        }
+          report+=`      Water: ${td.waterLitres}L\n`;
+          if (feedStr) report+=`      Feed: ${feedStr}\n`;
+          if (weightStr) report+=`      Weight: ${weightStr}\n`;
+        });
       }
       const allLitter = l.litterEntries || [];
       const allDeath = l.deathEntries || [];
@@ -697,7 +771,7 @@ function shareWhatsApp(){
   window.open('https://wa.me/?text='+message, '_blank');
 }
 
-// ----- Groups & Workers management (unchanged) -----
+// Groups & Workers management
 async function getLogs(){ const s=await db.ref('logs').once('value'); return s.val()?Object.values(s.val()):[]; }
 async function getGroups(){ const s=await db.ref('groups').once('value'); return s.val()?Object.values(s.val()):[]; }
 async function getWorkers(){ const s=await db.ref('workers').once('value'); return s.val()?Object.values(s.val()):[]; }
@@ -763,7 +837,6 @@ function setAnalyticsGroup(id){
   if(!document.getElementById('tab-analytics').classList.contains('hidden')) updateAnalytics();
 }
 
-// ----- Tab navigation -----
 function showTab(tab){
   ['overview','groups','analytics','activity','reports'].forEach(t=>{
     const el=document.getElementById('tab-'+t);
@@ -777,7 +850,6 @@ function showTab(tab){
   if(tab==='analytics') updateAnalytics();
 }
 
-// ----- Init -----
 function init(){
   document.getElementById('headerDate').textContent=
     new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
